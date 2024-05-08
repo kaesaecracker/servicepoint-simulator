@@ -1,8 +1,25 @@
+#![deny(clippy::all)]
+
+use std::default::Default;
+use std::io::ErrorKind;
 use std::mem::size_of;
 use std::net::UdpSocket;
+use std::sync::mpsc;
+use std::thread;
+use std::time::Duration;
 
 use clap::Parser;
+use image::GenericImage;
+use log::{debug, error, info, warn};
 use num_derive::FromPrimitive;
+use pixels::wgpu::TextureFormat;
+use pixels::{Pixels, PixelsBuilder, SurfaceTexture};
+use winit::application::ApplicationHandler;
+use winit::dpi::{LogicalSize, Size};
+use winit::event::WindowEvent;
+use winit::event_loop::{ActiveEventLoop, ControlFlow, EventLoop};
+use winit::platform::x11::WindowAttributesExtX11;
+use winit::window::{Window, WindowId};
 
 #[derive(Parser, Debug)]
 struct Cli {
@@ -60,68 +77,160 @@ const TILE_HEIGHT: u16 = 20;
 const TILE_COUNT: u16 = TILE_WIDTH * TILE_HEIGHT;
 const PIXEL_WIDTH: u16 = TILE_WIDTH * TILE_SIZE;
 const PIXEL_HEIGHT: u16 = TILE_HEIGHT * TILE_SIZE;
-const PIXEL_COUNT: u16 = PIXEL_WIDTH * TILE_HEIGHT;
+const PIXEL_COUNT: usize = PIXEL_WIDTH as usize * PIXEL_HEIGHT as usize;
 
-fn main() -> std::io::Result<()> {
+static mut DISPLAY: [bool; PIXEL_COUNT] = [false; PIXEL_COUNT];
+
+fn main() {
     assert_eq!(size_of::<HdrWindow>(), 10, "invalid struct size");
 
-    let cli = Cli::parse();
-    println!("running with args: {:?}", &cli);
+    env_logger::init();
 
-    loop {
-        // to emulate a hard reset, the actual main method gets called until it crashes
-        main2(&cli).unwrap();
-    }
+    let cli = Cli::parse();
+    info!("running with args: {:?}", &cli);
+
+    info!("display booting up");
+
+    let bind = cli.bind;
+    let (tx, rx) = mpsc::channel();
+    let thread = thread::spawn(move || {
+        let socket = UdpSocket::bind(bind).expect("could not bind socket");
+        socket
+            .set_nonblocking(true)
+            .expect("could not enter non blocking mode");
+
+        let mut buf = [0; 8985];
+
+        while rx.try_recv().is_err() {
+            let (amount, source) = match socket.recv_from(&mut buf) {
+                Err(err) if err.kind() == ErrorKind::WouldBlock => {
+                    thread::sleep(Duration::from_millis(1));
+                    continue;
+                }
+                Ok(result) => result,
+                other => other.unwrap(),
+            };
+            let received = &mut buf[..amount];
+
+            let header = read_hdr_window(&received[..10]);
+            if let Err(err) = header {
+                warn!("could not read header: {}", err);
+                continue;
+            }
+
+            let header = header.unwrap();
+            let payload = &received[10..];
+
+            info!(
+                "received from {:?}: {:?} (and {} bytes of payload)",
+                source,
+                header,
+                payload.len()
+            );
+
+            match header.command {
+                DisplayCommand::CmdClear => {
+                    info!("(imagine an empty screen now)")
+                }
+                DisplayCommand::CmdHardReset => {
+                    warn!("display shutting down");
+                    return;
+                }
+                DisplayCommand::CmdBitmapLinearWin => {
+                    print_bitmap_linear_win(&header, payload);
+                }
+                DisplayCommand::CmdCp437data => {
+                    print_cp437_data(&header, payload);
+                }
+                _ => {
+                    error!(
+                        "command {:?} sent by {:?} not implemented yet",
+                        header.command, source
+                    );
+                }
+            }
+        }
+    });
+
+    let event_loop = EventLoop::new().expect("could not create event loop");
+    event_loop.set_control_flow(ControlFlow::Poll);
+
+    let mut app = App::default();
+    event_loop
+        .run_app(&mut app)
+        .expect("could not run event loop");
+
+    tx.send(()).expect("could not cancel thread");
+    thread.join().expect("could not join threads");
 }
 
-fn main2(cli: &Cli) -> std::io::Result<()> {
-    println!("display booting up");
+#[derive(Default)]
+struct App {
+    window: Option<Window>,
+    pixels: Option<Pixels>,
+}
 
-    let screen = [0u8; TILE_COUNT as usize];
+impl ApplicationHandler for App {
+    fn resumed(&mut self, event_loop: &ActiveEventLoop) {
+        let size = Size::from(LogicalSize::new(PIXEL_WIDTH as f64, PIXEL_HEIGHT as f64));
+        let attributes = Window::default_attributes()
+            .with_title("pixel-receiver-rs")
+            .with_inner_size(size)
+            .with_resizable(false)
+            .with_visible(true);
 
-    let socket = UdpSocket::bind(&cli.bind)?;
-    let mut buf = [0; 8985];
+        let window = event_loop.create_window(attributes).unwrap();
+        self.window = Some(window);
+        let window = self.window.as_ref().unwrap();
 
-    loop {
-        let (amount, source) = socket.recv_from(&mut buf)?;
-        let received = &mut buf[..amount];
+        self.pixels = {
+            let window_size = window.inner_size();
+            let surface_texture =
+                SurfaceTexture::new(window_size.width, window_size.height, &window);
+            Some(
+                PixelsBuilder::new(PIXEL_WIDTH as u32, PIXEL_HEIGHT as u32, surface_texture)
+                    .render_texture_format(TextureFormat::Bgra8UnormSrgb)
+                    .build()
+                    .expect("could not create pixels"),
+            )
+        };
+    }
 
-        let header = read_hdr_window(&received[..10]);
-        if let Err(err) = header {
-            println!("could not read header: {}", err);
-            continue;
-        }
-
-        let header = header.unwrap();
-        let payload = &received[10..];
-
-        println!(
-            "received from {:?}: {:?} (and {} bytes of payload)",
-            source,
-            header,
-            payload.len()
-        );
-
-        match header.command {
-            DisplayCommand::CmdClear => {
-                println!("(imagine an empty screen now)")
+    fn window_event(&mut self, event_loop: &ActiveEventLoop, _: WindowId, event: WindowEvent) {
+        debug!("event {:?}", event);
+        match event {
+            WindowEvent::CloseRequested => {
+                warn!("The close button was pressed; stopping");
+                event_loop.exit();
             }
-            DisplayCommand::CmdHardReset => {
-                println!("display shutting down");
-                return Ok(());
+            WindowEvent::RedrawRequested => {
+                let window = self.window.as_ref().unwrap();
+                let pixels = self.pixels.as_mut().unwrap();
+                let frame = pixels.frame_mut().chunks_exact_mut(4);
+
+                let mut i = 0;
+                for pixel in frame {
+                    unsafe {
+                        if i >= DISPLAY.len() {
+                            break;
+                        }
+
+                        let color = if DISPLAY[i] {
+                            [255u8, 255, 255, 255]
+                        } else {
+                            [0u8, 0, 0, 255]
+                        };
+                        pixel.copy_from_slice(&color);
+                    }
+                    i += 1;
+                }
+
+                debug!("drawn {} pixels", i);
+
+                pixels.render().expect("could not render");
+                window.request_redraw();
             }
-            DisplayCommand::CmdBitmapLinearWin => {
-                print_bitmap_linear_win(&header, payload);
-            }
-            DisplayCommand::CmdCp437data => {
-                print_cp437_data(&header, payload);
-            }
-            _ => {
-                println!(
-                    "command {:?} sent by {:?} not implemented yet",
-                    header.command, source
-                );
-            }
+            _ => (),
         }
     }
 }
@@ -152,7 +261,7 @@ fn check_payload_size(buf: &[u8], expected: usize) -> bool {
         return true;
     }
 
-    println!(
+    error!(
         "expected a payload length of {} but got {}",
         expected, actual
     );
@@ -164,24 +273,39 @@ fn print_bitmap_linear_win(header: &HdrWindow, payload: &[u8]) {
         return;
     }
 
-    println!(
+    info!(
         "top left is offset {} tiles in x-direction and {} pixels in y-direction",
         header.x, header.y
     );
+
+    let mut text_repr = String::new();
+
     for y in 0..header.h {
         for byte_x in 0..header.w {
             let byte_index = (y * header.w + byte_x) as usize;
             let byte = payload[byte_index];
 
-            for e in (1u8..7u8).rev() {
-                let bitmask = 1 << e;
-                let char = if byte & bitmask != 0 { '█' } else { ' ' };
-                print!("{}", char);
+            for pixel_x in 1u8..=8u8 {
+                let bit_index = 8 - pixel_x;
+                let bitmask = 1 << bit_index;
+                let is_set = byte & bitmask != 0;
+                let char = if is_set { '█' } else { ' ' };
+                text_repr.push(char);
+
+                let x = byte_x * TILE_SIZE + pixel_x as u16;
+
+                let translated_x = (x + header.x) as usize;
+                let translated_y = (y + header.y) as usize;
+
+                unsafe {
+                    DISPLAY[translated_y * PIXEL_WIDTH as usize + translated_x] = is_set;
+                }
             }
         }
 
-        println!();
+        text_repr.push('\n');
     }
+    info!("{}", text_repr);
 }
 
 // TODO: actually convert from CP437
@@ -190,13 +314,17 @@ fn print_cp437_data(header: &HdrWindow, payload: &[u8]) {
         return;
     }
 
-    println!("top left is offset by ({} | {}) tiles", header.x, header.y);
+    info!("top left is offset by ({} | {}) tiles", header.x, header.y);
+
+    let mut str = String::new();
     for y in 0..header.h {
         for x in 0..header.w {
             let byte_index = (y * header.w + x) as usize;
-            print!("{}", payload[byte_index] as char)
+            str.push(payload[byte_index] as char);
         }
 
-        println!();
+        str.push('\n');
     }
+
+    info!("{}", str);
 }
