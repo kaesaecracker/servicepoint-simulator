@@ -1,10 +1,8 @@
 use std::mem::size_of;
-use std::net::UdpSocket;
+use std::net::{UdpSocket};
 
 use clap::Parser;
 use num_derive::FromPrimitive;
-
-use crate::DisplayCommand::CmdBitmapLinearWin;
 
 #[derive(Parser, Debug)]
 struct Cli {
@@ -60,9 +58,18 @@ fn main() -> std::io::Result<()> {
     assert_eq!(size_of::<HdrWindow>(), 10, "invalid struct size");
 
     let cli = Cli::parse();
-    println!("running with args: {:?}", cli);
+    println!("running with args: {:?}", &cli);
 
-    let socket = UdpSocket::bind(cli.bind)?;
+    loop {
+        // to emulate a hard reset, the actual main method gets called until it crashes
+        main2(&cli).unwrap();
+    }
+}
+
+fn main2(cli: &Cli) -> std::io::Result<()> {
+    println!("display booting up");
+
+    let socket = UdpSocket::bind(&cli.bind)?;
     let mut buf = [0; 8985];
 
     loop {
@@ -74,11 +81,19 @@ fn main() -> std::io::Result<()> {
             continue;
         }
 
+        let command_u16 =
+            u16::from_be(unsafe { std::ptr::read(received[0..=1].as_ptr() as *const u16) });
+        let maybe_command = num::FromPrimitive::from_u16(command_u16);
+        if maybe_command.is_none() {
+            println!(
+                "command {} received from {:?} is invalid",
+                command_u16, source
+            );
+            continue;
+        }
+
         let header: HdrWindow = HdrWindow {
-            command: num::FromPrimitive::from_u16(u16::from_be(unsafe {
-                std::ptr::read(received[0..=1].as_ptr() as *const u16)
-            }))
-            .unwrap(),
+            command: maybe_command.unwrap(),
             x: u16::from_be(unsafe { std::ptr::read(received[2..=3].as_ptr() as *const u16) }),
             y: u16::from_be(unsafe { std::ptr::read(received[4..=5].as_ptr() as *const u16) }),
             w: u16::from_be(unsafe { std::ptr::read(received[6..=7].as_ptr() as *const u16) }),
@@ -93,37 +108,80 @@ fn main() -> std::io::Result<()> {
             payload.len()
         );
 
-        if !matches!(header.command, CmdBitmapLinearWin) {
-            println!(
-                "command {:?} sent by {:?} not implemented yet",
-                header.command, source
-            );
-            continue;
-        }
-
-        let expected_size = (header.w * header.h) as usize;
-        if expected_size != payload.len() {
-            println!(
-                "expected a payload length of {} but got {} from {:?}",
-                expected_size,
-                payload.len(),
-                source
-            );
-            continue;
-        }
-
-        for y in 0..header.h {
-            for byte_x in 0..header.w {
-                let byte_index = (y * header.w + byte_x) as usize;
-                let byte = payload[byte_index];
-
-                for bitmask in [1, 2, 4, 8, 16, 32, 64, 128] {
-                    let char = if byte & bitmask == bitmask {'█'} else {' '};
-                    print!("{}", char);
-                }
+        match header.command {
+            DisplayCommand::CmdClear => {
+                println!("(imagine an empty screen now)")
             }
-
-            println!();
+            DisplayCommand::CmdHardReset => {
+                println!("display shutting down");
+                return Ok(());
+            }
+            DisplayCommand::CmdBitmapLinearWin => {
+                print_bitmap_linear_win(&header, payload);
+            }
+            DisplayCommand::CmdCp437data => {
+                print_cp437_data(&header, payload);
+            }
+            _ => {
+                println!(
+                    "command {:?} sent by {:?} not implemented yet",
+                    header.command, source
+                );
+            }
         }
+    }
+}
+
+fn check_payload_size(buf: &[u8], expected: usize) -> bool {
+    let actual = buf.len();
+    if actual == expected {
+        return true;
+    }
+
+    println!(
+        "expected a payload length of {} but got {}",
+        expected, actual
+    );
+    return false;
+}
+
+fn print_bitmap_linear_win(header: &HdrWindow, payload: &[u8]) {
+    if !check_payload_size(payload, (header.w * header.h) as usize) {
+        return;
+    }
+
+    println!("top left is offset by ({} | {})", header.x, header.y);
+    for y in 0..header.h {
+        for byte_x in 0..header.w {
+            let byte_index = (y * header.w + byte_x) as usize;
+            let byte = payload[byte_index];
+
+            for bitmask in [1, 2, 4, 8, 16, 32, 64, 128] {
+                let char = if byte & bitmask == bitmask {
+                    '█'
+                } else {
+                    ' '
+                };
+                print!("{}", char);
+            }
+        }
+
+        println!();
+    }
+}
+
+fn print_cp437_data(header: &HdrWindow, payload: &[u8]) {
+    if !check_payload_size(payload, (header.w * header.h) as usize) {
+        return;
+    }
+
+    println!("top left is offset by ({} | {})", header.x, header.y);
+    for y in 0..header.h {
+        for byte_x in 0..header.w {
+            let byte_index = (y * header.w + byte_x) as usize;
+            print!("{}", payload[byte_index] as char)
+        }
+
+        println!();
     }
 }
