@@ -54,6 +54,14 @@ struct HdrBitmap {
     reserved: u16,
 }
 
+const TILE_SIZE: u16 = 8;
+const TILE_WIDTH: u16 = 65;
+const TILE_HEIGHT: u16 = 20;
+const TILE_COUNT: u16 = TILE_WIDTH * TILE_HEIGHT;
+const PIXEL_WIDTH: u16 = TILE_WIDTH * TILE_SIZE;
+const PIXEL_HEIGHT: u16 = TILE_HEIGHT * TILE_SIZE;
+const PIXEL_COUNT: u16 = PIXEL_WIDTH * TILE_HEIGHT;
+
 fn main() -> std::io::Result<()> {
     assert_eq!(size_of::<HdrWindow>(), 10, "invalid struct size");
 
@@ -69,6 +77,8 @@ fn main() -> std::io::Result<()> {
 fn main2(cli: &Cli) -> std::io::Result<()> {
     println!("display booting up");
 
+    let screen = [0u8; TILE_COUNT as usize];
+
     let socket = UdpSocket::bind(&cli.bind)?;
     let mut buf = [0; 8985];
 
@@ -77,13 +87,14 @@ fn main2(cli: &Cli) -> std::io::Result<()> {
         let received = &mut buf[..amount];
 
         let header = read_hdr_window(&received[..10]);
-        if header.is_err() {
-            println!("could not read header: {}", header.err().unwrap());
+        if let Err(err) = header {
+            println!("could not read header: {}", err);
             continue;
         }
-        let header = header.unwrap();
 
+        let header = header.unwrap();
         let payload = &received[10..];
+
         println!(
             "received from {:?}: {:?} (and {} bytes of payload)",
             source,
@@ -153,18 +164,18 @@ fn print_bitmap_linear_win(header: &HdrWindow, payload: &[u8]) {
         return;
     }
 
-    println!("top left is offset by ({} | {})", header.x, header.y);
+    println!(
+        "top left is offset {} tiles in x-direction and {} pixels in y-direction",
+        header.x, header.y
+    );
     for y in 0..header.h {
         for byte_x in 0..header.w {
             let byte_index = (y * header.w + byte_x) as usize;
             let byte = payload[byte_index];
 
-            for bitmask in [1, 2, 4, 8, 16, 32, 64, 128] {
-                let char = if byte & bitmask == bitmask {
-                    '█'
-                } else {
-                    ' '
-                };
+            for e in (1u8..7u8).rev() {
+                let bitmask = 1 << e;
+                let char = if byte & bitmask != 0 { '█' } else { ' ' };
                 print!("{}", char);
             }
         }
@@ -179,10 +190,10 @@ fn print_cp437_data(header: &HdrWindow, payload: &[u8]) {
         return;
     }
 
-    println!("top left is offset by ({} | {})", header.x, header.y);
+    println!("top left is offset by ({} | {}) tiles", header.x, header.y);
     for y in 0..header.h {
-        for byte_x in 0..header.w {
-            let byte_index = (y * header.w + byte_x) as usize;
+        for x in 0..header.w {
+            let byte_index = (y * header.w + x) as usize;
             print!("{}", payload[byte_index] as char)
         }
 
