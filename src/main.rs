@@ -1,5 +1,5 @@
 use std::mem::size_of;
-use std::net::{UdpSocket};
+use std::net::UdpSocket;
 
 use clap::Parser;
 use num_derive::FromPrimitive;
@@ -76,29 +76,12 @@ fn main2(cli: &Cli) -> std::io::Result<()> {
         let (amount, source) = socket.recv_from(&mut buf)?;
         let received = &mut buf[..amount];
 
-        if amount < size_of::<HdrWindow>() {
-            println!("received a packet that is too small from {:?}", source);
+        let header = read_hdr_window(&received[..10]);
+        if header.is_err() {
+            println!("could not read header: {}", header.err().unwrap());
             continue;
         }
-
-        let command_u16 =
-            u16::from_be(unsafe { std::ptr::read(received[0..=1].as_ptr() as *const u16) });
-        let maybe_command = num::FromPrimitive::from_u16(command_u16);
-        if maybe_command.is_none() {
-            println!(
-                "command {} received from {:?} is invalid",
-                command_u16, source
-            );
-            continue;
-        }
-
-        let header: HdrWindow = HdrWindow {
-            command: maybe_command.unwrap(),
-            x: u16::from_be(unsafe { std::ptr::read(received[2..=3].as_ptr() as *const u16) }),
-            y: u16::from_be(unsafe { std::ptr::read(received[4..=5].as_ptr() as *const u16) }),
-            w: u16::from_be(unsafe { std::ptr::read(received[6..=7].as_ptr() as *const u16) }),
-            h: u16::from_be(unsafe { std::ptr::read(received[8..=9].as_ptr() as *const u16) }),
-        };
+        let header = header.unwrap();
 
         let payload = &received[10..];
         println!(
@@ -130,6 +113,26 @@ fn main2(cli: &Cli) -> std::io::Result<()> {
             }
         }
     }
+}
+
+fn read_hdr_window(buffer: &[u8]) -> Result<HdrWindow, String> {
+    if buffer.len() < size_of::<HdrWindow>() {
+        return Err("received a packet that is too small".into());
+    }
+
+    let command_u16 = u16::from_be(unsafe { std::ptr::read(buffer[0..=1].as_ptr() as *const u16) });
+    let maybe_command = num::FromPrimitive::from_u16(command_u16);
+    if maybe_command.is_none() {
+        return Err(format!("received invalid command {}", command_u16));
+    }
+
+    return Ok(HdrWindow {
+        command: maybe_command.unwrap(),
+        x: u16::from_be(unsafe { std::ptr::read(buffer[2..=3].as_ptr() as *const u16) }),
+        y: u16::from_be(unsafe { std::ptr::read(buffer[4..=5].as_ptr() as *const u16) }),
+        w: u16::from_be(unsafe { std::ptr::read(buffer[6..=7].as_ptr() as *const u16) }),
+        h: u16::from_be(unsafe { std::ptr::read(buffer[8..=9].as_ptr() as *const u16) }),
+    });
 }
 
 fn check_payload_size(buf: &[u8], expected: usize) -> bool {
@@ -170,6 +173,7 @@ fn print_bitmap_linear_win(header: &HdrWindow, payload: &[u8]) {
     }
 }
 
+// TODO: actually convert from CP437
 fn print_cp437_data(header: &HdrWindow, payload: &[u8]) {
     if !check_payload_size(payload, (header.w * header.h) as usize) {
         return;
