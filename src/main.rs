@@ -102,7 +102,7 @@ fn main() {
         let mut buf = [0; 8985];
 
         while rx.try_recv().is_err() {
-            let (amount, source) = match socket.recv_from(&mut buf) {
+            let (amount, _) = match socket.recv_from(&mut buf) {
                 Err(err) if err.kind() == ErrorKind::WouldBlock => {
                     thread::sleep(Duration::from_millis(1));
                     continue;
@@ -110,45 +110,8 @@ fn main() {
                 Ok(result) => result,
                 other => other.unwrap(),
             };
-            let received = &mut buf[..amount];
 
-            let header = read_hdr_window(&received[..10]);
-            if let Err(err) = header {
-                warn!("could not read header: {}", err);
-                continue;
-            }
-
-            let header = header.unwrap();
-            let payload = &received[10..];
-
-            info!(
-                "received from {:?}: {:?} (and {} bytes of payload)",
-                source,
-                header,
-                payload.len()
-            );
-
-            match header.command {
-                DisplayCommand::CmdClear => {
-                    info!("(imagine an empty screen now)")
-                }
-                DisplayCommand::CmdHardReset => {
-                    warn!("display shutting down");
-                    return;
-                }
-                DisplayCommand::CmdBitmapLinearWin => {
-                    print_bitmap_linear_win(&header, payload);
-                }
-                DisplayCommand::CmdCp437data => {
-                    print_cp437_data(&header, payload);
-                }
-                _ => {
-                    error!(
-                        "command {:?} sent by {:?} not implemented yet",
-                        header.command, source
-                    );
-                }
-            }
+            handle_package(&mut buf[..amount]);
         }
     });
 
@@ -164,6 +127,42 @@ fn main() {
     thread.join().expect("could not join threads");
 }
 
+fn handle_package(received: &mut [u8]) {
+    let header = read_hdr_window(&received[..10]);
+    if let Err(err) = header {
+        warn!("could not read header: {}", err);
+        return;
+    }
+
+    let header = header.unwrap();
+    let payload = &received[10..];
+
+    info!(
+        "received from {:?} (and {} bytes of payload)",
+        header,
+        payload.len()
+    );
+
+    match header.command {
+        DisplayCommand::CmdClear => {
+            info!("(imagine an empty screen now)")
+        }
+        DisplayCommand::CmdHardReset => {
+            warn!("display shutting down");
+            return;
+        }
+        DisplayCommand::CmdBitmapLinearWin => {
+            print_bitmap_linear_win(&header, payload);
+        }
+        DisplayCommand::CmdCp437data => {
+            print_cp437_data(&header, payload);
+        }
+        _ => {
+            error!("command {:?} not implemented yet", header.command);
+        }
+    }
+}
+
 #[derive(Default)]
 struct App {
     window: Option<Window>,
@@ -175,9 +174,7 @@ impl ApplicationHandler for App {
         let size = Size::from(LogicalSize::new(PIXEL_WIDTH as f64, PIXEL_HEIGHT as f64));
         let attributes = Window::default_attributes()
             .with_title("pixel-receiver-rs")
-            .with_inner_size(size)
-            .with_resizable(false)
-            .with_visible(true);
+            .with_inner_size(size);
 
         let window = event_loop.create_window(attributes).unwrap();
         self.window = Some(window);
