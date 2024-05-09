@@ -51,7 +51,6 @@ enum DisplayCommand {
     CmdBitmapLinearXor = 0x0016,
 }
 
-
 #[repr(C)]
 #[derive(Debug)]
 struct HdrWindow {
@@ -123,7 +122,7 @@ fn read_hdr_window(buffer: &[u8]) -> Result<HdrWindow, String> {
         return Err("received a packet that is too small".into());
     }
 
-    let command_u16 = u16::from_be(unsafe { std::ptr::read(buffer[0..=1].as_ptr() as *const u16) });
+    let command_u16 = read_beu16_from_buffer(&buffer[0..=1]);
     let maybe_command = num::FromPrimitive::from_u16(command_u16);
     if maybe_command.is_none() {
         return Err(format!("received invalid command {}", command_u16));
@@ -131,11 +130,24 @@ fn read_hdr_window(buffer: &[u8]) -> Result<HdrWindow, String> {
 
     return Ok(HdrWindow {
         command: maybe_command.unwrap(),
-        x: u16::from_be(unsafe { std::ptr::read(buffer[2..=3].as_ptr() as *const u16) }),
-        y: u16::from_be(unsafe { std::ptr::read(buffer[4..=5].as_ptr() as *const u16) }),
-        w: u16::from_be(unsafe { std::ptr::read(buffer[6..=7].as_ptr() as *const u16) }),
-        h: u16::from_be(unsafe { std::ptr::read(buffer[8..=9].as_ptr() as *const u16) }),
+        x: read_beu16_from_buffer(&buffer[2..=3]),
+        y: read_beu16_from_buffer(&buffer[4..=5]),
+        w: read_beu16_from_buffer(&buffer[6..=7]),
+        h: read_beu16_from_buffer(&buffer[8..=9]),
     });
+}
+
+fn read_beu16_from_buffer(buffer: &[u8]) -> u16 {
+    assert_eq!(
+        buffer.len(),
+        2,
+        "cannot read u16 from buffer with size != 2"
+    );
+
+    let ptr = buffer.as_ptr() as *const u16;
+    let u16 = unsafe { *ptr };
+
+    return u16::from_be(u16);
 }
 
 fn check_payload_size(buf: &[u8], expected: usize) -> bool {
@@ -179,9 +191,10 @@ fn print_bitmap_linear_win(header: &HdrWindow, payload: &[u8]) {
 
                 let translated_x = (x + header.x) as usize;
                 let translated_y = (y + header.y) as usize;
+                let index = translated_y * PIXEL_WIDTH as usize + translated_x;
 
                 unsafe {
-                    DISPLAY[translated_y * PIXEL_WIDTH as usize + translated_x] = is_set;
+                    DISPLAY[index] = is_set;
                 }
             }
         }

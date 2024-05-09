@@ -52,18 +52,14 @@ impl ApplicationHandler for App {
 
                 let mut i = 0;
                 for pixel in frame {
-                    unsafe {
-                        if i >= DISPLAY.len() {
-                            break;
-                        }
+                    let is_set = unsafe { DISPLAY[i] };
+                    let color = if is_set {
+                        [255u8, 255, 255, 255]
+                    } else {
+                        [0u8, 0, 0, 255]
+                    };
 
-                        let color = if DISPLAY[i] {
-                            [255u8, 255, 255, 255]
-                        } else {
-                            [0u8, 0, 0, 255]
-                        };
-                        pixel.copy_from_slice(&color);
-                    }
+                    pixel.copy_from_slice(&color);
                     i += 1;
                 }
 
