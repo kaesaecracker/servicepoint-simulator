@@ -82,13 +82,11 @@ enum DisplaySubcommand {
 */
 
 fn handle_package(received: &mut [u8]) {
-    let header = read_hdr_window(&received[..10]);
-    if let Err(err) = header {
-        warn!("could not read header: {}", err);
-        return;
-    }
+    let header = match read_hdr_window(&received[..10]){
+        None => return,
+        Some(value) => value
+    };
 
-    let header = header.unwrap();
     let payload = &received[10..];
 
     info!(
@@ -99,7 +97,10 @@ fn handle_package(received: &mut [u8]) {
 
     match header.command {
         DisplayCommand::CmdClear => {
-            info!("(imagine an empty screen now)")
+            info!("clearing display");
+            for v in unsafe { DISPLAY.iter_mut() } {
+                *v = false;
+            }
         }
         DisplayCommand::CmdHardReset => {
             warn!("display shutting down");
@@ -117,18 +118,29 @@ fn handle_package(received: &mut [u8]) {
     }
 }
 
-fn read_hdr_window(buffer: &[u8]) -> Result<HdrWindow, String> {
+fn read_hdr_window(buffer: &[u8]) -> Option<HdrWindow> {
     if buffer.len() < size_of::<HdrWindow>() {
-        return Err("received a packet that is too small".into());
+        error!("received a packet that is too small");
+        return None;
     }
 
     let command_u16 = read_beu16_from_buffer(&buffer[0..=1]);
     let maybe_command = num::FromPrimitive::from_u16(command_u16);
     if maybe_command.is_none() {
-        return Err(format!("received invalid command {}", command_u16));
+        error!("received invalid command {}", command_u16);
+
+        let maybe_command: Option<DisplayCommand> = num::FromPrimitive::from_u16(u16::swap_bytes(command_u16));
+        if let Some(command) = maybe_command {
+            error!(
+                "The reversed byte order of {} matches command {:?}, you are probably sending the wrong endianness",
+                command_u16, command
+            );
+        }
+
+        return None;
     }
 
-    return Ok(HdrWindow {
+    return Some(HdrWindow {
         command: maybe_command.unwrap(),
         x: read_beu16_from_buffer(&buffer[2..=3]),
         y: read_beu16_from_buffer(&buffer[4..=5]),

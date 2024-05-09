@@ -31,11 +31,9 @@ fn main() {
     env_logger::init();
 
     let cli = Cli::parse();
-    info!("running with args: {:?}", &cli);
+    info!("starting with args: {:?}", &cli);
 
-    info!("display booting up");
     let (stop_udp_tx, stop_udp_rx) = mpsc::channel();
-
     let thread = start_udp_thread(cli.bind, stop_udp_rx);
 
     let event_loop = EventLoop::new().expect("could not create event loop");
