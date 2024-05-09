@@ -10,6 +10,7 @@ use crate::gui::App;
 use crate::upd_loop::start_udp_thread;
 use clap::Parser;
 use log::info;
+use pixel_shared_rs::PIXEL_COUNT;
 use winit::event_loop::{ControlFlow, EventLoop};
 
 #[derive(Parser, Debug)]
@@ -17,13 +18,6 @@ struct Cli {
     #[arg(long = "bind", default_value = "0.0.0.0:2342")]
     bind: String,
 }
-
-const TILE_SIZE: u16 = 8;
-const TILE_WIDTH: u16 = 65;
-const TILE_HEIGHT: u16 = 20;
-const PIXEL_WIDTH: u16 = TILE_WIDTH * TILE_SIZE;
-const PIXEL_HEIGHT: u16 = TILE_HEIGHT * TILE_SIZE;
-const PIXEL_COUNT: usize = PIXEL_WIDTH as usize * PIXEL_HEIGHT as usize;
 
 static mut DISPLAY: [bool; PIXEL_COUNT] = [false; PIXEL_COUNT];
 

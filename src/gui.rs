@@ -1,5 +1,6 @@
-use crate::{DISPLAY, PIXEL_HEIGHT, PIXEL_WIDTH};
+use crate::DISPLAY;
 use log::{debug, warn};
+use pixel_shared_rs::{PIXEL_HEIGHT, PIXEL_WIDTH};
 use pixels::wgpu::TextureFormat;
 use pixels::{Pixels, PixelsBuilder, SurfaceTexture};
 use winit::application::ApplicationHandler;

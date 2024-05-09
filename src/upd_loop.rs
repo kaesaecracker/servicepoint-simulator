@@ -1,6 +1,8 @@
-use crate::{DISPLAY, PIXEL_WIDTH, TILE_SIZE};
+use crate::DISPLAY;
 use log::{error, info, warn};
-use pixel_shared_rs::{read_hdr_window, DisplayCommand, HdrWindow, ReadHdrWindowError};
+use pixel_shared_rs::{
+    read_hdr_window, DisplayCommand, HdrWindow, ReadHdrWindowError, PIXEL_WIDTH, TILE_SIZE,
+};
 use std::io::ErrorKind;
 use std::mem::size_of;
 use std::net::UdpSocket;
