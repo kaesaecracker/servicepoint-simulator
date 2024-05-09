@@ -30,6 +30,10 @@ pub fn start_udp_thread(bind: String, stop_receiver: Receiver<()>) -> JoinHandle
                 other => other.unwrap(),
             };
 
+            if amount == buf.len(){
+                warn!("the received package may have been truncated to a length of {}", amount);
+            }
+
             handle_package(&mut buf[..amount]);
         }
     });
