@@ -1561,12 +1561,19 @@ dependencies = [
  "env_logger",
  "image",
  "log",
- "num",
- "num-derive",
- "num-traits",
+ "pixel-shared-rs",
  "pixels",
  "raw-window-handle 0.6.1",
  "winit",
+]
+
+[[package]]
+name = "pixel-shared-rs"
+version = "0.1.0"
+dependencies = [
+ "num",
+ "num-derive",
+ "num-traits",
 ]
 
 [[package]]

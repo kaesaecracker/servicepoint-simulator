@@ -1,6 +1,6 @@
 use crate::{DISPLAY, PIXEL_WIDTH, TILE_SIZE};
 use log::{error, info, warn};
-use num_derive::FromPrimitive;
+use pixel_shared_rs::{read_hdr_window, DisplayCommand, HdrWindow, ReadHdrWindowError};
 use std::io::ErrorKind;
 use std::mem::size_of;
 use std::net::UdpSocket;
@@ -30,8 +30,11 @@ pub fn start_udp_thread(bind: String, stop_receiver: Receiver<()>) -> JoinHandle
                 other => other.unwrap(),
             };
 
-            if amount == buf.len(){
-                warn!("the received package may have been truncated to a length of {}", amount);
+            if amount == buf.len() {
+                warn!(
+                    "the received package may have been truncated to a length of {}",
+                    amount
+                );
             }
 
             handle_package(&mut buf[..amount]);
@@ -39,56 +42,24 @@ pub fn start_udp_thread(bind: String, stop_receiver: Receiver<()>) -> JoinHandle
     });
 }
 
-#[derive(Debug, FromPrimitive)]
-enum DisplayCommand {
-    CmdClear = 0x0002,
-    CmdCp437data = 0x0003,
-    CmdCharBrightness = 0x0005,
-    CmdBrightness = 0x0007,
-    CmdHardReset = 0x000b,
-    CmdFadeOut = 0x000d,
-    CmdBitmapLegacy = 0x0010,
-    CmdBitmapLinear = 0x0012,
-    CmdBitmapLinearWin = 0x0013,
-    CmdBitmapLinearAnd = 0x0014,
-    CmdBitmapLinearOr = 0x0015,
-    CmdBitmapLinearXor = 0x0016,
-}
-
-#[repr(C)]
-#[derive(Debug)]
-struct HdrWindow {
-    command: DisplayCommand,
-    x: u16,
-    y: u16,
-    w: u16,
-    h: u16,
-}
-
-/* needed for commands that are not implemented yet
-#[repr(C)]
-struct HdrBitmap {
-    command: DisplayCommand,
-    offset: u16,
-    length: u16,
-    subcommand: DisplaySubcommand,
-    reserved: u16,
-}
-
-#[repr(u16)]
-enum DisplaySubcommand {
-    SubCmdBitmapNormal = 0x0,
-    SubCmdBitmapCompressZ = 0x677a,
-    SubCmdBitmapCompressBz = 0x627a,
-    SubCmdBitmapCompressLz = 0x6c7a,
-    SubCmdBitmapCompressZs = 0x7a73,
-}
-*/
-
 fn handle_package(received: &mut [u8]) {
-    let header = match read_hdr_window(&received[..10]){
-        None => return,
-        Some(value) => value
+    let header = match read_hdr_window(&received[..10]) {
+        Err(ReadHdrWindowError::BufferTooSmall) => {
+            error!("received a packet that is too small");
+            return;
+        }
+        Err(ReadHdrWindowError::InvalidCommand(command_u16)) => {
+            error!("received invalid command {}", command_u16);
+            return;
+        }
+        Err(ReadHdrWindowError::WrongCommandEndianness(command_u16, command_swapped)) => {
+            error!(
+                "The reversed byte order of {} matches command {:?}, you are probably sending the wrong endianness",
+                command_u16, command_swapped
+            );
+            return;
+        }
+        Ok(value) => value,
     };
 
     let payload = &received[10..];
@@ -120,50 +91,6 @@ fn handle_package(received: &mut [u8]) {
             error!("command {:?} not implemented yet", header.command);
         }
     }
-}
-
-fn read_hdr_window(buffer: &[u8]) -> Option<HdrWindow> {
-    if buffer.len() < size_of::<HdrWindow>() {
-        error!("received a packet that is too small");
-        return None;
-    }
-
-    let command_u16 = read_beu16_from_buffer(&buffer[0..=1]);
-    let maybe_command = num::FromPrimitive::from_u16(command_u16);
-    if maybe_command.is_none() {
-        error!("received invalid command {}", command_u16);
-
-        let maybe_command: Option<DisplayCommand> = num::FromPrimitive::from_u16(u16::swap_bytes(command_u16));
-        if let Some(command) = maybe_command {
-            error!(
-                "The reversed byte order of {} matches command {:?}, you are probably sending the wrong endianness",
-                command_u16, command
-            );
-        }
-
-        return None;
-    }
-
-    return Some(HdrWindow {
-        command: maybe_command.unwrap(),
-        x: read_beu16_from_buffer(&buffer[2..=3]),
-        y: read_beu16_from_buffer(&buffer[4..=5]),
-        w: read_beu16_from_buffer(&buffer[6..=7]),
-        h: read_beu16_from_buffer(&buffer[8..=9]),
-    });
-}
-
-fn read_beu16_from_buffer(buffer: &[u8]) -> u16 {
-    assert_eq!(
-        buffer.len(),
-        2,
-        "cannot read u16 from buffer with size != 2"
-    );
-
-    let ptr = buffer.as_ptr() as *const u16;
-    let u16 = unsafe { *ptr };
-
-    return u16::from_be(u16);
 }
 
 fn check_payload_size(buf: &[u8], expected: usize) -> bool {
