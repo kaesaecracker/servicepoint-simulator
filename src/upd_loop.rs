@@ -1,7 +1,7 @@
 use crate::DISPLAY;
 use log::{error, info, warn};
 use pixel_shared_rs::{
-    read_hdr_window, DisplayCommand, HdrWindow, ReadHdrWindowError, PIXEL_WIDTH, TILE_SIZE,
+    read_header, DisplayCommand, HdrWindow, ReadHeaderError, PIXEL_WIDTH, TILE_SIZE,
 };
 use std::io::ErrorKind;
 use std::mem::size_of;
@@ -45,16 +45,16 @@ pub fn start_udp_thread(bind: String, stop_receiver: Receiver<()>) -> JoinHandle
 }
 
 fn handle_package(received: &mut [u8]) {
-    let header = match read_hdr_window(&received[..10]) {
-        Err(ReadHdrWindowError::BufferTooSmall) => {
+    let header = match read_header(&received[..10]) {
+        Err(ReadHeaderError::BufferTooSmall) => {
             error!("received a packet that is too small");
             return;
         }
-        Err(ReadHdrWindowError::InvalidCommand(command_u16)) => {
+        Err(ReadHeaderError::InvalidCommand(command_u16)) => {
             error!("received invalid command {}", command_u16);
             return;
         }
-        Err(ReadHdrWindowError::WrongCommandEndianness(command_u16, command_swapped)) => {
+        Err(ReadHeaderError::WrongCommandEndianness(command_u16, command_swapped)) => {
             error!(
                 "The reversed byte order of {} matches command {:?}, you are probably sending the wrong endianness",
                 command_u16, command_swapped
