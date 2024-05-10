@@ -67,13 +67,13 @@ impl ApplicationHandler for App<'_> {
 
                 let window = self.window.as_ref().unwrap();
                 let pixels = self.pixels.as_mut().unwrap();
+
                 let mut frame = pixels.frame_mut().chunks_exact_mut(4);
 
                 let display = self.display.read().unwrap();
 
-                let size = window.inner_size();
-                for y in 0..size.height {
-                    for x in 0..size.width {
+                for y in 0..PIXEL_HEIGHT {
+                    for x in 0..PIXEL_WIDTH {
                         let is_set = display.get(x as usize, y as usize);
                         let color = if is_set {
                             [255u8, 255, 255, 255]
