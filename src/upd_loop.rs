@@ -1,8 +1,8 @@
 use crate::font::BitmapFont;
-use crate::protocol::{read_header, DisplayCommandCode, HdrWindow, ReadHeaderError};
+use crate::protocol::{HdrWindow, ReadHeaderError};
 use crate::DISPLAY;
 use log::{debug, error, info, warn};
-use servicepoint2::{PixelGrid, PIXEL_WIDTH, TILE_SIZE};
+use servicepoint2::{PixelGrid, PIXEL_WIDTH, TILE_SIZE, DisplayCommandCode};
 use std::io::ErrorKind;
 use std::net::{ToSocketAddrs, UdpSocket};
 use std::sync::mpsc;
@@ -60,7 +60,7 @@ impl UdpThread {
     }
 
     fn handle_package(received: &mut [u8], font: &BitmapFont) {
-        let header = match read_header(&received[..10]) {
+        let header = match HdrWindow::from_buffer(&received[..10]) {
             Err(ReadHeaderError::BufferTooSmall) => {
                 error!("received a packet that is too small");
                 return;
