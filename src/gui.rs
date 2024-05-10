@@ -1,6 +1,6 @@
+use crate::protocol::{PIXEL_HEIGHT, PIXEL_WIDTH};
 use crate::DISPLAY;
-use log::{debug, warn};
-use pixel_shared_rs::{PIXEL_HEIGHT, PIXEL_WIDTH};
+use log::{trace, warn};
 use pixels::wgpu::TextureFormat;
 use pixels::{Pixels, PixelsBuilder, SurfaceTexture};
 use winit::application::ApplicationHandler;
@@ -40,7 +40,7 @@ impl ApplicationHandler for App {
     }
 
     fn window_event(&mut self, event_loop: &ActiveEventLoop, _: WindowId, event: WindowEvent) {
-        debug!("event {:?}", event);
+        trace!("event {:?}", event);
         match event {
             WindowEvent::CloseRequested => {
                 warn!("The close button was pressed; stopping");
@@ -63,8 +63,6 @@ impl ApplicationHandler for App {
                     pixel.copy_from_slice(&color);
                     i += 1;
                 }
-
-                debug!("drawn {} pixels", i);
 
                 pixels.render().expect("could not render");
                 window.request_redraw();

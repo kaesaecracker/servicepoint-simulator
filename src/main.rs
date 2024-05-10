@@ -2,6 +2,7 @@
 
 mod gui;
 mod upd_loop;
+mod protocol;
 
 use std::default::Default;
 use std::sync::mpsc;
@@ -10,12 +11,12 @@ use crate::gui::App;
 use crate::upd_loop::start_udp_thread;
 use clap::Parser;
 use log::info;
-use pixel_shared_rs::PIXEL_COUNT;
+use protocol::PIXEL_COUNT;
 use winit::event_loop::{ControlFlow, EventLoop};
 
 #[derive(Parser, Debug)]
 struct Cli {
-    #[arg(long = "bind", default_value = "0.0.0.0:2342")]
+    #[arg(long, default_value = "0.0.0.0:2342")]
     bind: String,
 }
 

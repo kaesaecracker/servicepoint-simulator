@@ -1,8 +1,8 @@
-use crate::DISPLAY;
-use log::{error, info, warn};
-use pixel_shared_rs::{
+use crate::protocol::{
     read_header, DisplayCommand, HdrWindow, ReadHeaderError, PIXEL_WIDTH, TILE_SIZE,
 };
+use crate::DISPLAY;
+use log::{error, info, warn};
 use std::io::ErrorKind;
 use std::mem::size_of;
 use std::net::UdpSocket;
@@ -109,7 +109,7 @@ fn check_payload_size(buf: &[u8], expected: usize) -> bool {
 }
 
 fn print_bitmap_linear_win(header: &HdrWindow, payload: &[u8]) {
-    if !check_payload_size(payload, (header.w * header.h) as usize) {
+    if !check_payload_size(payload, header.w as usize * header.h as usize) {
         return;
     }
 
@@ -118,19 +118,15 @@ fn print_bitmap_linear_win(header: &HdrWindow, payload: &[u8]) {
         header.x, header.y
     );
 
-    let mut text_repr = String::new();
-
     for y in 0..header.h {
         for byte_x in 0..header.w {
             let byte_index = (y * header.w + byte_x) as usize;
             let byte = payload[byte_index];
 
-            for pixel_x in 1u8..=8u8 {
-                let bit_index = 8 - pixel_x;
+            for pixel_x in 0u8..8u8 {
+                let bit_index = 7 - pixel_x;
                 let bitmask = 1 << bit_index;
                 let is_set = byte & bitmask != 0;
-                let char = if is_set { '█' } else { ' ' };
-                text_repr.push(char);
 
                 let x = byte_x * TILE_SIZE + pixel_x as u16;
 
@@ -143,10 +139,7 @@ fn print_bitmap_linear_win(header: &HdrWindow, payload: &[u8]) {
                 }
             }
         }
-
-        text_repr.push('\n');
     }
-    info!("{}", text_repr);
 }
 
 // TODO: actually convert from CP437
