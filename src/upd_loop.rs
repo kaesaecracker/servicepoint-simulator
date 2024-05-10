@@ -2,7 +2,7 @@ use crate::font::BitmapFont;
 use crate::protocol::{HdrWindow, ReadHeaderError};
 use crate::DISPLAY;
 use log::{debug, error, info, warn};
-use servicepoint2::{PixelGrid, PIXEL_WIDTH, TILE_SIZE, DisplayCommandCode};
+use servicepoint2::{PixelGrid, PIXEL_WIDTH, TILE_SIZE, CommandCode};
 use std::io::ErrorKind;
 use std::net::{ToSocketAddrs, UdpSocket};
 use std::sync::mpsc;
@@ -88,20 +88,20 @@ impl UdpThread {
         );
 
         match header.command {
-            DisplayCommandCode::Clear => {
+            CommandCode::Clear => {
                 info!("clearing display");
                 for v in unsafe { DISPLAY.iter_mut() } {
                     *v = false;
                 }
             }
-            DisplayCommandCode::HardReset => {
+            CommandCode::HardReset => {
                 warn!("display shutting down");
                 return;
             }
-            DisplayCommandCode::BitmapLinearWin => {
+            CommandCode::BitmapLinearWin => {
                 Self::print_bitmap_linear_win(&header, payload);
             }
-            DisplayCommandCode::Cp437data => {
+            CommandCode::Cp437Data => {
                 Self::print_cp437_data(&header, payload, font);
             }
             _ => {

@@ -2151,7 +2151,7 @@ dependencies = [
 [[package]]
 name = "servicepoint2"
 version = "0.1.0"
-source = "git+https://github.com/kaesaecracker/servicepoint.git#06d3a99659dc32060c7a302fa8d7147c5227dda6"
+source = "git+https://github.com/kaesaecracker/servicepoint.git#9eaa7462bccee02f698779b0fb4b9c1e9676bc60"
 dependencies = [
  "num",
  "num-derive",

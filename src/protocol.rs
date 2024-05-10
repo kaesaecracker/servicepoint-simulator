@@ -1,11 +1,11 @@
 use num_derive::{FromPrimitive, ToPrimitive};
-use servicepoint2::DisplayCommandCode;
+use servicepoint2::CommandCode;
 use std::mem::size_of;
 
 #[repr(C)]
 #[derive(Debug)]
 pub struct HdrWindow {
-    pub command: DisplayCommandCode,
+    pub command: CommandCode,
     pub x: u16,
     pub y: u16,
     pub w: u16,
@@ -36,7 +36,7 @@ pub enum DisplaySubcommand {
 #[derive(Debug)]
 pub enum ReadHeaderError {
     BufferTooSmall,
-    WrongCommandEndianness(u16, DisplayCommandCode),
+    WrongCommandEndianness(u16, CommandCode),
     InvalidCommand(u16),
 }
 
@@ -49,7 +49,7 @@ impl HdrWindow {
         }
 
         let command_u16 = Self::read_beu16(&buffer[0..=1]);
-        return match DisplayCommandCode::from_primitive(command_u16) {
+        return match CommandCode::from_primitive(command_u16) {
             Some(command) => Ok(HdrWindow {
                 command,
                 x: Self::read_beu16(&buffer[2..=3]),
@@ -58,8 +58,7 @@ impl HdrWindow {
                 h: Self::read_beu16(&buffer[8..=9]),
             }),
             None => {
-                let maybe_command =
-                    DisplayCommandCode::from_primitive(u16::swap_bytes(command_u16));
+                let maybe_command = CommandCode::from_primitive(u16::swap_bytes(command_u16));
                 return match maybe_command {
                     None => Err(ReadHeaderError::InvalidCommand(command_u16)),
                     Some(command) => Err(ReadHeaderError::WrongCommandEndianness(
