@@ -1,8 +1,8 @@
-use crate::protocol::{PIXEL_HEIGHT, PIXEL_WIDTH};
 use crate::DISPLAY;
 use log::{trace, warn};
 use pixels::wgpu::TextureFormat;
 use pixels::{Pixels, PixelsBuilder, SurfaceTexture};
+use servicepoint2::{PIXEL_HEIGHT, PIXEL_WIDTH};
 use winit::application::ApplicationHandler;
 use winit::dpi::{LogicalSize, Size};
 use winit::event::WindowEvent;

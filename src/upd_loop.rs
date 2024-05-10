@@ -1,164 +1,179 @@
-use crate::protocol::{
-    read_header, DisplayCommand, HdrWindow, ReadHeaderError, PIXEL_WIDTH, TILE_SIZE,
-};
+use crate::font::BitmapFont;
+use crate::protocol::{read_header, DisplayCommandCode, HdrWindow, ReadHeaderError};
 use crate::DISPLAY;
-use log::{error, info, warn};
+use log::{debug, error, info, warn};
+use servicepoint2::{PixelGrid, PIXEL_WIDTH, TILE_SIZE};
 use std::io::ErrorKind;
-use std::mem::size_of;
-use std::net::UdpSocket;
-use std::sync::mpsc::Receiver;
+use std::net::{ToSocketAddrs, UdpSocket};
+use std::sync::mpsc;
+use std::sync::mpsc::Sender;
 use std::thread;
 use std::thread::JoinHandle;
 use std::time::Duration;
 
-pub fn start_udp_thread(bind: String, stop_receiver: Receiver<()>) -> JoinHandle<()> {
-    assert_eq!(size_of::<HdrWindow>(), 10, "invalid struct size");
+pub struct UdpThread {
+    thread: JoinHandle<()>,
+    stop_tx: Sender<()>,
+}
 
-    return thread::spawn(move || {
+impl UdpThread {
+    pub fn start_new(bind: impl ToSocketAddrs) -> Self {
+        let (stop_tx, stop_rx) = mpsc::channel();
+
         let socket = UdpSocket::bind(bind).expect("could not bind socket");
         socket
             .set_nonblocking(true)
             .expect("could not enter non blocking mode");
 
-        let mut buf = [0; 8985];
+        let font = BitmapFont::load_file("Web437_IBM_BIOS.woff");
 
-        while stop_receiver.try_recv().is_err() {
-            let (amount, _) = match socket.recv_from(&mut buf) {
-                Err(err) if err.kind() == ErrorKind::WouldBlock => {
-                    thread::sleep(Duration::from_millis(1));
-                    continue;
+        let thread = thread::spawn(move || {
+            let mut buf = [0; 8985];
+
+            while stop_rx.try_recv().is_err() {
+                let (amount, _) = match socket.recv_from(&mut buf) {
+                    Err(err) if err.kind() == ErrorKind::WouldBlock => {
+                        thread::sleep(Duration::from_millis(1));
+                        continue;
+                    }
+                    Ok(result) => result,
+                    other => other.unwrap(),
+                };
+
+                if amount == buf.len() {
+                    warn!(
+                        "the received package may have been truncated to a length of {}",
+                        amount
+                    );
                 }
-                Ok(result) => result,
-                other => other.unwrap(),
-            };
 
-            if amount == buf.len() {
-                warn!(
-                    "the received package may have been truncated to a length of {}",
-                    amount
-                );
+                Self::handle_package(&mut buf[..amount], &font);
             }
+        });
 
-            handle_package(&mut buf[..amount]);
-        }
-    });
-}
+        return Self { stop_tx, thread };
+    }
 
-fn handle_package(received: &mut [u8]) {
-    let header = match read_header(&received[..10]) {
-        Err(ReadHeaderError::BufferTooSmall) => {
-            error!("received a packet that is too small");
-            return;
-        }
-        Err(ReadHeaderError::InvalidCommand(command_u16)) => {
-            error!("received invalid command {}", command_u16);
-            return;
-        }
-        Err(ReadHeaderError::WrongCommandEndianness(command_u16, command_swapped)) => {
-            error!(
+    pub fn stop_and_wait(self) {
+        self.stop_tx.send(()).expect("could not send stop packet");
+        self.thread.join().expect("could not wait on udp thread");
+    }
+
+    fn handle_package(received: &mut [u8], font: &BitmapFont) {
+        let header = match read_header(&received[..10]) {
+            Err(ReadHeaderError::BufferTooSmall) => {
+                error!("received a packet that is too small");
+                return;
+            }
+            Err(ReadHeaderError::InvalidCommand(command_u16)) => {
+                error!("received invalid command {}", command_u16);
+                return;
+            }
+            Err(ReadHeaderError::WrongCommandEndianness(command_u16, command_swapped)) => {
+                error!(
                 "The reversed byte order of {} matches command {:?}, you are probably sending the wrong endianness",
                 command_u16, command_swapped
             );
-            return;
-        }
-        Ok(value) => value,
-    };
+                return;
+            }
+            Ok(value) => value,
+        };
 
-    let payload = &received[10..];
+        let payload = &received[10..];
 
-    info!(
-        "received from {:?} (and {} bytes of payload)",
-        header,
-        payload.len()
-    );
+        info!(
+            "received from {:?} (and {} bytes of payload)",
+            header,
+            payload.len()
+        );
 
-    match header.command {
-        DisplayCommand::CmdClear => {
-            info!("clearing display");
-            for v in unsafe { DISPLAY.iter_mut() } {
-                *v = false;
+        match header.command {
+            DisplayCommandCode::Clear => {
+                info!("clearing display");
+                for v in unsafe { DISPLAY.iter_mut() } {
+                    *v = false;
+                }
+            }
+            DisplayCommandCode::HardReset => {
+                warn!("display shutting down");
+                return;
+            }
+            DisplayCommandCode::BitmapLinearWin => {
+                Self::print_bitmap_linear_win(&header, payload);
+            }
+            DisplayCommandCode::Cp437data => {
+                Self::print_cp437_data(&header, payload, font);
+            }
+            _ => {
+                error!("command {:?} not implemented yet", header.command);
             }
         }
-        DisplayCommand::CmdHardReset => {
-            warn!("display shutting down");
+    }
+
+    fn check_payload_size(buf: &[u8], expected: usize) -> bool {
+        let actual = buf.len();
+        if actual == expected {
+            return true;
+        }
+
+        error!(
+            "expected a payload length of {} but got {}",
+            expected, actual
+        );
+        return false;
+    }
+
+    fn print_bitmap_linear_win(header: &HdrWindow, payload: &[u8]) {
+        if !Self::check_payload_size(payload, header.w as usize * header.h as usize) {
             return;
         }
-        DisplayCommand::CmdBitmapLinearWin => {
-            print_bitmap_linear_win(&header, payload);
-        }
-        DisplayCommand::CmdCp437data => {
-            print_cp437_data(&header, payload);
-        }
-        _ => {
-            error!("command {:?} not implemented yet", header.command);
-        }
-    }
-}
 
-fn check_payload_size(buf: &[u8], expected: usize) -> bool {
-    let actual = buf.len();
-    if actual == expected {
-        return true;
+        let pixel_grid = PixelGrid::load(
+            header.w as usize * TILE_SIZE as usize,
+            header.h as usize,
+            payload,
+        );
+
+        Self::print_pixel_grid(
+            header.x as usize * TILE_SIZE as usize,
+            header.y as usize,
+            &pixel_grid,
+        );
     }
 
-    error!(
-        "expected a payload length of {} but got {}",
-        expected, actual
-    );
-    return false;
-}
+    fn print_cp437_data(header: &HdrWindow, payload: &[u8], font: &BitmapFont) {
+        if !UdpThread::check_payload_size(payload, (header.w * header.h) as usize) {
+            return;
+        }
 
-fn print_bitmap_linear_win(header: &HdrWindow, payload: &[u8]) {
-    if !check_payload_size(payload, header.w as usize * header.h as usize) {
-        return;
+        for char_y in 0usize..header.h as usize {
+            for char_x in 0usize..header.w as usize {
+                let char_code = payload[char_y * header.w as usize + char_x];
+
+                let tile_x = char_x + header.x as usize;
+                let tile_y = char_y + header.y as usize;
+
+                let bitmap = font.get_bitmap(char_code);
+                Self::print_pixel_grid(
+                    tile_x * TILE_SIZE as usize,
+                    tile_y * TILE_SIZE as usize,
+                    bitmap,
+                );
+            }
+        }
     }
 
-    info!(
-        "top left is offset {} tiles in x-direction and {} pixels in y-direction",
-        header.x, header.y
-    );
-
-    for y in 0..header.h {
-        for byte_x in 0..header.w {
-            let byte_index = (y * header.w + byte_x) as usize;
-            let byte = payload[byte_index];
-
-            for pixel_x in 0u8..8u8 {
-                let bit_index = 7 - pixel_x;
-                let bitmask = 1 << bit_index;
-                let is_set = byte & bitmask != 0;
-
-                let x = byte_x * TILE_SIZE + pixel_x as u16;
-
-                let translated_x = (x + header.x) as usize;
-                let translated_y = (y + header.y) as usize;
-                let index = translated_y * PIXEL_WIDTH as usize + translated_x;
-
+    fn print_pixel_grid(offset_x: usize, offset_y: usize, pixels: &PixelGrid) {
+        debug!("printing {}x{} grid at {offset_x} {offset_y}", pixels.width, pixels.height);
+        for inner_y in 0..pixels.height {
+            for inner_x in 0..pixels.width {
+                let is_set = pixels.get(inner_x, inner_y);
+                let display_index =
+                    (offset_x + inner_x) + ((offset_y + inner_y) * PIXEL_WIDTH as usize);
                 unsafe {
-                    DISPLAY[index] = is_set;
+                    DISPLAY[display_index] = is_set;
                 }
             }
         }
     }
-}
-
-// TODO: actually convert from CP437
-fn print_cp437_data(header: &HdrWindow, payload: &[u8]) {
-    if !check_payload_size(payload, (header.w * header.h) as usize) {
-        return;
-    }
-
-    info!("top left is offset by ({} | {}) tiles", header.x, header.y);
-
-    let mut str = String::new();
-    for y in 0..header.h {
-        for x in 0..header.w {
-            let byte_index = (y * header.w + x) as usize;
-            str.push(payload[byte_index] as char);
-        }
-
-        str.push('\n');
-    }
-
-    info!("{}", str);
 }

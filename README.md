@@ -8,3 +8,9 @@ Use cases:
 - getting error messages for invalid packages
 - test your project when outside of CCCB
 - test your project while other people are using the display
+
+## Legal stuff
+
+The included font is https://int10h.org/oldschool-pc-fonts/fontlist/font?ibm_bios (included in the download from https://int10h.org/oldschool-pc-fonts/download/). The font is CC BY-SA 4.0.
+
+For everything else see the LICENSE file.

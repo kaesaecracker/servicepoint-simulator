@@ -1,17 +1,17 @@
 #![deny(clippy::all)]
 
+mod font;
 mod gui;
-mod upd_loop;
 mod protocol;
+mod upd_loop;
 
 use std::default::Default;
-use std::sync::mpsc;
 
 use crate::gui::App;
-use crate::upd_loop::start_udp_thread;
+use crate::upd_loop::UdpThread;
 use clap::Parser;
 use log::info;
-use protocol::PIXEL_COUNT;
+use servicepoint2::PIXEL_COUNT;
 use winit::event_loop::{ControlFlow, EventLoop};
 
 #[derive(Parser, Debug)]
@@ -28,8 +28,7 @@ fn main() {
     let cli = Cli::parse();
     info!("starting with args: {:?}", &cli);
 
-    let (stop_udp_tx, stop_udp_rx) = mpsc::channel();
-    let thread = start_udp_thread(cli.bind, stop_udp_rx);
+    let thread = UdpThread::start_new(cli.bind);
 
     let event_loop = EventLoop::new().expect("could not create event loop");
     event_loop.set_control_flow(ControlFlow::Poll);
@@ -39,6 +38,5 @@ fn main() {
         .run_app(&mut app)
         .expect("could not run event loop");
 
-    stop_udp_tx.send(()).expect("could not cancel thread");
-    thread.join().expect("could not join threads");
+    thread.stop_and_wait();
 }

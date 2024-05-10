@@ -1,27 +1,38 @@
-use num_derive::{FromPrimitive, ToPrimitive};
 use std::mem::size_of;
 
+use num_derive::{FromPrimitive, ToPrimitive};
+#[repr(u16)]
 #[derive(Debug, FromPrimitive, ToPrimitive, Default)]
-pub enum DisplayCommand {
+pub enum DisplayCommandCode {
     #[default]
-    CmdClear = 0x0002,
-    CmdCp437data = 0x0003,
-    CmdCharBrightness = 0x0005,
-    CmdBrightness = 0x0007,
-    CmdHardReset = 0x000b,
-    CmdFadeOut = 0x000d,
-    CmdBitmapLegacy = 0x0010,
-    CmdBitmapLinear = 0x0012,
-    CmdBitmapLinearWin = 0x0013,
-    CmdBitmapLinearAnd = 0x0014,
-    CmdBitmapLinearOr = 0x0015,
-    CmdBitmapLinearXor = 0x0016,
+    Clear = 0x0002,
+    Cp437data = 0x0003,
+    CharBrightness = 0x0005,
+    Brightness = 0x0007,
+    HardReset = 0x000b,
+    FadeOut = 0x000d,
+    BitmapLegacy = 0x0010,
+    BitmapLinear = 0x0012,
+    BitmapLinearWin = 0x0013,
+    BitmapLinearAnd = 0x0014,
+    BitmapLinearOr = 0x0015,
+    BitmapLinearXor = 0x0016,
+}
+
+impl DisplayCommandCode {
+    pub fn from_primitive(value: u16) -> Option<Self> {
+        num::FromPrimitive::from_u16(value)
+    }
+
+    pub fn to_primitive(&self) -> u16 {
+        num::ToPrimitive::to_u16(self).unwrap()
+    }
 }
 
 #[repr(C)]
 #[derive(Debug, Default)]
 pub struct HdrWindow {
-    pub command: DisplayCommand,
+    pub command: DisplayCommandCode,
     pub x: u16,
     pub y: u16,
     pub w: u16,
@@ -49,27 +60,22 @@ pub enum DisplaySubcommand {
     SubCmdBitmapCompressZs = 0x7a73,
 }
 
-pub const TILE_SIZE: u16 = 8;
-pub const TILE_WIDTH: u16 = 56;
-pub const TILE_HEIGHT: u16 = 20;
-pub const PIXEL_WIDTH: u16 = TILE_WIDTH * TILE_SIZE;
-pub const PIXEL_HEIGHT: u16 = TILE_HEIGHT * TILE_SIZE;
-pub const PIXEL_COUNT: usize = PIXEL_WIDTH as usize * PIXEL_HEIGHT as usize;
-
 #[derive(Debug)]
 pub enum ReadHeaderError {
     BufferTooSmall,
-    WrongCommandEndianness(u16, DisplayCommand),
+    WrongCommandEndianness(u16, DisplayCommandCode),
     InvalidCommand(u16),
 }
 
 pub fn read_header(buffer: &[u8]) -> Result<HdrWindow, ReadHeaderError> {
+    assert_eq!(size_of::<HdrWindow>(), 10, "invalid struct size");
+
     if buffer.len() < size_of::<HdrWindow>() {
         return Err(ReadHeaderError::BufferTooSmall);
     }
 
     let command_u16 = read_beu16(&buffer[0..=1]);
-    return match num::FromPrimitive::from_u16(command_u16) {
+    return match DisplayCommandCode::from_primitive(command_u16) {
         Some(command) => Ok(HdrWindow {
             command,
             x: read_beu16(&buffer[2..=3]),
@@ -78,8 +84,7 @@ pub fn read_header(buffer: &[u8]) -> Result<HdrWindow, ReadHeaderError> {
             h: read_beu16(&buffer[8..=9]),
         }),
         None => {
-            let maybe_command: Option<DisplayCommand> =
-                num::FromPrimitive::from_u16(u16::swap_bytes(command_u16));
+            let maybe_command = DisplayCommandCode::from_primitive(u16::swap_bytes(command_u16));
             return match maybe_command {
                 None => Err(ReadHeaderError::InvalidCommand(command_u16)),
                 Some(command) => Err(ReadHeaderError::WrongCommandEndianness(
