@@ -9,11 +9,11 @@ use clap::Parser;
 use log::{debug, error, info, warn};
 use servicepoint2::{
     Command, Origin, Packet, PixelGrid, Size, Window, PIXEL_HEIGHT, PIXEL_WIDTH, TILE_SIZE,
+    TILE_WIDTH,
 };
 use std::io::ErrorKind;
 use std::net::UdpSocket;
 use std::sync::{mpsc, RwLock, RwLockWriteGuard};
-use std::thread;
 use std::time::Duration;
 use winit::event_loop::{ControlFlow, EventLoop};
 
@@ -50,7 +50,7 @@ fn main() {
             while stop_udp_rx.try_recv().is_err() {
                 let (amount, _) = match socket.recv_from(&mut buf) {
                     Err(err) if err.kind() == ErrorKind::WouldBlock => {
-                        thread::sleep(Duration::from_millis(1));
+                        std::thread::sleep(Duration::from_millis(1));
                         continue;
                     }
                     Ok(result) => result,
@@ -87,107 +87,133 @@ fn main() {
 
         udp_thread.join().expect("could not join udp thread");
     });
+}
 
-    fn handle_package(
-        received: Packet,
-        font: &BitmapFont,
-        display: &mut RwLockWriteGuard<PixelGrid>,
-    ) {
-        // TODO handle error case
-        let command = match Command::try_from(received) {
-            Err(err) => {
-                warn!("could not read command for packet: {:?}", err);
-                return;
-            }
-            Ok(val) => val,
-        };
-
-        match command {
-            Command::Clear => {
-                info!("clearing display");
-                display.fill(false);
-            }
-            Command::HardReset => {
-                warn!("display shutting down");
-                return;
-            }
-            Command::BitmapLinearWin(Origin(x, y), pixels) => {
-                print_pixel_grid(x as usize, y as usize, &pixels, display);
-            }
-            Command::Cp437Data(window, payload) => {
-                print_cp437_data(window, &payload, font, display);
-            }
-            Command::BitmapLegacy => {
-                warn!("ignoring deprecated command {:?}", command);
-            }
-            Command::BitmapLinear(offset, vec) => {}
-            Command::BitmapLinearAnd(_, _) => {}
-            Command::BitmapLinearOr(_, _) => {}
-            Command::BitmapLinearXor(_, _) => {}
-
-            Command::FadeOut => {}
-            Command::CharBrightness(_, _) => {}
-            Command::Brightness(_) => {}
-        };
-    }
-
-    fn check_payload_size(buf: &[u8], expected: usize) -> bool {
-        let actual = buf.len();
-        if actual == expected {
-            return true;
-        }
-
-        error!(
-            "expected a payload length of {} but got {}",
-            expected, actual
-        );
-        return false;
-    }
-
-    fn print_cp437_data(
-        window: Window,
-        payload: &[u8],
-        font: &BitmapFont,
-        display: &mut RwLockWriteGuard<PixelGrid>,
-    ) {
-        let Window(Origin(x, y), Size(w, h)) = window;
-        if !check_payload_size(payload, (w * h) as usize) {
+fn handle_package(received: Packet, font: &BitmapFont, display: &mut RwLockWriteGuard<PixelGrid>) {
+    let command = match Command::try_from(received) {
+        Err(err) => {
+            warn!("could not read command for packet: {:?}", err);
             return;
         }
+        Ok(val) => val,
+    };
 
-        for char_y in 0usize..h as usize {
-            for char_x in 0usize..w as usize {
-                let char_code = payload[char_y * w as usize + char_x];
-
-                let tile_x = char_x + x as usize;
-                let tile_y = char_y + y as usize;
-
-                let bitmap = font.get_bitmap(char_code);
-                print_pixel_grid(
-                    tile_x * TILE_SIZE as usize,
-                    tile_y * TILE_SIZE as usize,
-                    bitmap,
-                    display,
-                );
+    match command {
+        Command::Clear => {
+            info!("clearing display");
+            display.fill(false);
+        }
+        Command::HardReset => {
+            warn!("display shutting down");
+            return;
+        }
+        Command::BitmapLinearWin(Origin(x, y), pixels) => {
+            print_pixel_grid(x as usize, y as usize, &pixels, display);
+        }
+        Command::Cp437Data(window, payload) => {
+            print_cp437_data(window, &payload, font, display);
+        }
+        #[allow(deprecated)]
+        Command::BitmapLegacy => {
+            warn!("ignoring deprecated command {:?}", command);
+        }
+        Command::BitmapLinear(offset, vec) => {
+            for bitmap_index in 0..vec.len() {
+                let pixel_index = offset as usize + bitmap_index;
+                let y = pixel_index / TILE_WIDTH as usize;
+                let x = pixel_index % TILE_SIZE as usize;
+                display.set(x, y, vec.get(bitmap_index));
             }
         }
+        Command::BitmapLinearAnd(offset, vec) => {
+            for bitmap_index in 0..vec.len() {
+                let pixel_index = offset as usize + bitmap_index;
+                let y = pixel_index / TILE_WIDTH as usize;
+                let x = pixel_index % TILE_SIZE as usize;
+                let old_value = display.get(x, y);
+                display.set(x, y, old_value && vec.get(bitmap_index));
+            }
+        }
+        Command::BitmapLinearOr(offset, vec) => {
+            for bitmap_index in 0..vec.len() {
+                let pixel_index = offset as usize + bitmap_index;
+                let y = pixel_index / TILE_WIDTH as usize;
+                let x = pixel_index % TILE_SIZE as usize;
+                let old_value = display.get(x, y);
+                display.set(x, y, old_value || vec.get(bitmap_index));
+            }
+        }
+        Command::BitmapLinearXor(offset, vec) => {
+            for bitmap_index in 0..vec.len() {
+                let pixel_index = offset as usize + bitmap_index;
+                let y = pixel_index / TILE_WIDTH as usize;
+                let x = pixel_index % TILE_SIZE as usize;
+                let old_value = display.get(x, y);
+                display.set(x, y, old_value ^ vec.get(bitmap_index));
+            }
+        }
+        _ => {
+            error!("command not implemented: {command:?}")
+        }
+    };
+}
+
+fn check_payload_size(buf: &[u8], expected: usize) -> bool {
+    let actual = buf.len();
+    if actual == expected {
+        return true;
     }
 
-    fn print_pixel_grid(
-        offset_x: usize,
-        offset_y: usize,
-        pixels: &PixelGrid,
-        display: &mut RwLockWriteGuard<PixelGrid>,
-    ) {
-        debug!(
-            "printing {}x{} grid at {offset_x} {offset_y}",
-            pixels.width, pixels.height
-        );
-        for inner_y in 0..pixels.height {
-            for inner_x in 0..pixels.width {
-                let is_set = pixels.get(inner_x, inner_y);
-                display.set(offset_x + inner_x, offset_y + inner_y, is_set);
-            }
+    error!(
+        "expected a payload length of {} but got {}",
+        expected, actual
+    );
+    return false;
+}
+
+fn print_cp437_data(
+    window: Window,
+    payload: &[u8],
+    font: &BitmapFont,
+    display: &mut RwLockWriteGuard<PixelGrid>,
+) {
+    let Window(Origin(x, y), Size(w, h)) = window;
+    if !check_payload_size(payload, (w * h) as usize) {
+        return;
+    }
+
+    for char_y in 0usize..h as usize {
+        for char_x in 0usize..w as usize {
+            let char_code = payload[char_y * w as usize + char_x];
+
+            let tile_x = char_x + x as usize;
+            let tile_y = char_y + y as usize;
+
+            let bitmap = font.get_bitmap(char_code);
+            print_pixel_grid(
+                tile_x * TILE_SIZE as usize,
+                tile_y * TILE_SIZE as usize,
+                bitmap,
+                display,
+            );
+        }
+    }
+}
+
+fn print_pixel_grid(
+    offset_x: usize,
+    offset_y: usize,
+    pixels: &PixelGrid,
+    display: &mut RwLockWriteGuard<PixelGrid>,
+) {
+    debug!(
+        "printing {}x{} grid at {offset_x} {offset_y}",
+        pixels.width, pixels.height
+    );
+    for inner_y in 0..pixels.height {
+        for inner_x in 0..pixels.width {
+            let is_set = pixels.get(inner_x, inner_y);
+            display.set(offset_x + inner_x, offset_y + inner_y, is_set);
         }
     }
 }
