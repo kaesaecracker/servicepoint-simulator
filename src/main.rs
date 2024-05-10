@@ -2,7 +2,6 @@
 
 mod font;
 mod gui;
-mod protocol;
 mod upd_loop;
 
 use std::default::Default;
