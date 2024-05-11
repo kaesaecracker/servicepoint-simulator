@@ -133,8 +133,8 @@ fn handle_package(
             let mut display = display_ref.write().unwrap();
             for bitmap_index in 0..vec.len() {
                 let pixel_index = offset as usize + bitmap_index;
-                let y = pixel_index / TILE_WIDTH as usize;
-                let x = pixel_index % TILE_SIZE as usize;
+                let y = pixel_index / PIXEL_WIDTH as usize;
+                let x = pixel_index % PIXEL_WIDTH as usize;
                 display.set(x, y, vec.get(bitmap_index));
             }
         }
@@ -142,8 +142,8 @@ fn handle_package(
             let mut display = display_ref.write().unwrap();
             for bitmap_index in 0..vec.len() {
                 let pixel_index = offset as usize + bitmap_index;
-                let y = pixel_index / TILE_WIDTH as usize;
-                let x = pixel_index % TILE_SIZE as usize;
+                let y = pixel_index / PIXEL_WIDTH as usize;
+                let x = pixel_index % PIXEL_WIDTH as usize;
                 let old_value = display.get(x, y);
                 display.set(x, y, old_value && vec.get(bitmap_index));
             }
@@ -152,8 +152,8 @@ fn handle_package(
             let mut display = display_ref.write().unwrap();
             for bitmap_index in 0..vec.len() {
                 let pixel_index = offset as usize + bitmap_index;
-                let y = pixel_index / TILE_WIDTH as usize;
-                let x = pixel_index % TILE_SIZE as usize;
+                let y = pixel_index / PIXEL_WIDTH as usize;
+                let x = pixel_index % PIXEL_WIDTH as usize;
                 let old_value = display.get(x, y);
                 display.set(x, y, old_value || vec.get(bitmap_index));
             }
@@ -162,8 +162,8 @@ fn handle_package(
             let mut display = display_ref.write().unwrap();
             for bitmap_index in 0..vec.len() {
                 let pixel_index = offset as usize + bitmap_index;
-                let y = pixel_index / TILE_WIDTH as usize;
-                let x = pixel_index % TILE_SIZE as usize;
+                let y = pixel_index / PIXEL_WIDTH as usize;
+                let x = pixel_index % PIXEL_WIDTH as usize;
                 let old_value = display.get(x, y);
                 display.set(x, y, old_value ^ vec.get(bitmap_index));
             }
