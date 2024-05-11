@@ -8,8 +8,8 @@ use crate::gui::App;
 use clap::Parser;
 use log::{debug, error, info, warn};
 use servicepoint2::{
-    Command, Origin, Packet, PixelGrid, Size, Window, PIXEL_HEIGHT, PIXEL_WIDTH, TILE_SIZE,
-    TILE_WIDTH,
+    ByteGrid, Command, Origin, Packet, PixelGrid, PIXEL_HEIGHT, PIXEL_WIDTH, TILE_HEIGHT,
+    TILE_SIZE, TILE_WIDTH,
 };
 use std::io::ErrorKind;
 use std::net::UdpSocket;
@@ -36,9 +36,13 @@ fn main() {
 
     let font = BitmapFont::load_file("Web437_IBM_BIOS.woff");
 
-    let display = PixelGrid::new(PIXEL_WIDTH as usize, PIXEL_HEIGHT as usize);
-    let display_locked = RwLock::new(display);
-    let display_locked_ref = &display_locked;
+    let display = RwLock::new(PixelGrid::new(PIXEL_WIDTH as usize, PIXEL_HEIGHT as usize));
+    let display_ref = &display;
+
+    let mut luma = ByteGrid::new(TILE_WIDTH as usize, TILE_HEIGHT as usize);
+    luma.fill(u8::MAX);
+    let luma = RwLock::new(luma);
+    let luma_ref = &luma;
 
     std::thread::scope(move |scope| {
         let (stop_udp_tx, stop_udp_rx) = mpsc::channel();
@@ -67,14 +71,13 @@ fn main() {
                 let vec = buf[..amount].to_vec();
                 let package = servicepoint2::Packet::from(vec);
 
-                let mut display = display_locked_ref.write().unwrap();
-                handle_package(package, &font, &mut display);
+                handle_package(package, &font, display_ref, luma_ref);
             }
 
             stop_ui_tx.send(()).expect("could not stop ui thread");
         });
 
-        let mut app = App::new(display_locked_ref, stop_ui_rx);
+        let mut app = App::new(display_ref, luma_ref, stop_ui_rx);
 
         let event_loop = EventLoop::new().expect("could not create event loop");
         event_loop.set_control_flow(ControlFlow::Poll);
@@ -89,7 +92,12 @@ fn main() {
     });
 }
 
-fn handle_package(received: Packet, font: &BitmapFont, display: &mut RwLockWriteGuard<PixelGrid>) {
+fn handle_package(
+    received: Packet,
+    font: &BitmapFont,
+    display_ref: &RwLock<PixelGrid>,
+    luma_ref: &RwLock<ByteGrid>,
+) {
     let command = match Command::try_from(received) {
         Err(err) => {
             warn!("could not read command for packet: {:?}", err);
@@ -101,23 +109,27 @@ fn handle_package(received: Packet, font: &BitmapFont, display: &mut RwLockWrite
     match command {
         Command::Clear => {
             info!("clearing display");
-            display.fill(false);
+            display_ref.write().unwrap().fill(false);
         }
         Command::HardReset => {
             warn!("display shutting down");
             return;
         }
         Command::BitmapLinearWin(Origin(x, y), pixels) => {
-            print_pixel_grid(x as usize, y as usize, &pixels, display);
+            let mut display = display_ref.write().unwrap();
+            print_pixel_grid(x as usize, y as usize, &pixels, &mut display);
         }
-        Command::Cp437Data(window, payload) => {
-            print_cp437_data(window, &payload, font, display);
+        Command::Cp437Data(origin, grid) => {
+            let mut display = display_ref.write().unwrap();
+            print_cp437_data(origin, &grid, font, &mut display);
         }
         #[allow(deprecated)]
         Command::BitmapLegacy => {
             warn!("ignoring deprecated command {:?}", command);
         }
+        // TODO: how to deduplicate this code in a rusty way?
         Command::BitmapLinear(offset, vec) => {
+            let mut display = display_ref.write().unwrap();
             for bitmap_index in 0..vec.len() {
                 let pixel_index = offset as usize + bitmap_index;
                 let y = pixel_index / TILE_WIDTH as usize;
@@ -126,6 +138,7 @@ fn handle_package(received: Packet, font: &BitmapFont, display: &mut RwLockWrite
             }
         }
         Command::BitmapLinearAnd(offset, vec) => {
+            let mut display = display_ref.write().unwrap();
             for bitmap_index in 0..vec.len() {
                 let pixel_index = offset as usize + bitmap_index;
                 let y = pixel_index / TILE_WIDTH as usize;
@@ -135,6 +148,7 @@ fn handle_package(received: Packet, font: &BitmapFont, display: &mut RwLockWrite
             }
         }
         Command::BitmapLinearOr(offset, vec) => {
+            let mut display = display_ref.write().unwrap();
             for bitmap_index in 0..vec.len() {
                 let pixel_index = offset as usize + bitmap_index;
                 let y = pixel_index / TILE_WIDTH as usize;
@@ -144,6 +158,7 @@ fn handle_package(received: Packet, font: &BitmapFont, display: &mut RwLockWrite
             }
         }
         Command::BitmapLinearXor(offset, vec) => {
+            let mut display = display_ref.write().unwrap();
             for bitmap_index in 0..vec.len() {
                 let pixel_index = offset as usize + bitmap_index;
                 let y = pixel_index / TILE_WIDTH as usize;
@@ -152,39 +167,38 @@ fn handle_package(received: Packet, font: &BitmapFont, display: &mut RwLockWrite
                 display.set(x, y, old_value ^ vec.get(bitmap_index));
             }
         }
-        _ => {
+        Command::CharBrightness(origin, grid) => {
+            let Origin(offset_x, offset_y) = origin;
+            let offset_x = offset_x as usize;
+            let offset_y = offset_y as usize;
+
+            let mut luma = luma_ref.write().unwrap();
+            for inner_y in 0..grid.height {
+                for inner_x in 0..grid.width {
+                    let brightness = grid.get(inner_x, inner_y);
+                    luma.set(offset_x + inner_x, offset_y + inner_y, brightness);
+                }
+            }
+        }
+        Command::Brightness(brightness) => {
+            luma_ref.write().unwrap().fill(brightness);
+        }
+        Command::FadeOut => {
             error!("command not implemented: {command:?}")
         }
     };
 }
 
-fn check_payload_size(buf: &[u8], expected: usize) -> bool {
-    let actual = buf.len();
-    if actual == expected {
-        return true;
-    }
-
-    error!(
-        "expected a payload length of {} but got {}",
-        expected, actual
-    );
-    return false;
-}
-
 fn print_cp437_data(
-    window: Window,
-    payload: &[u8],
+    origin: Origin,
+    grid: &ByteGrid,
     font: &BitmapFont,
     display: &mut RwLockWriteGuard<PixelGrid>,
 ) {
-    let Window(Origin(x, y), Size(w, h)) = window;
-    if !check_payload_size(payload, (w * h) as usize) {
-        return;
-    }
-
-    for char_y in 0usize..h as usize {
-        for char_x in 0usize..w as usize {
-            let char_code = payload[char_y * w as usize + char_x];
+    let Origin(x, y) = origin;
+    for char_y in 0usize..grid.height {
+        for char_x in 0usize..grid.width {
+            let char_code = grid.get(char_x, char_y);
 
             let tile_x = char_x + x as usize;
             let tile_y = char_y + y as usize;

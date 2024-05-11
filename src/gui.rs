@@ -1,7 +1,7 @@
-use log::{trace, warn};
+use log::warn;
 use pixels::wgpu::TextureFormat;
 use pixels::{Pixels, PixelsBuilder, SurfaceTexture};
-use servicepoint2::{PixelGrid, PIXEL_HEIGHT, PIXEL_WIDTH};
+use servicepoint2::{ByteGrid, PixelGrid, PIXEL_HEIGHT, PIXEL_WIDTH, TILE_SIZE};
 use std::sync::mpsc::Receiver;
 use std::sync::RwLock;
 use winit::application::ApplicationHandler;
@@ -12,15 +12,21 @@ use winit::window::{Window, WindowId};
 
 pub struct App<'t> {
     display: &'t RwLock<PixelGrid>,
+    luma: &'t RwLock<ByteGrid>,
     window: Option<Window>,
     pixels: Option<Pixels>,
     stop_ui_rx: Receiver<()>,
 }
 
 impl<'t> App<'t> {
-    pub fn new(display: &RwLock<PixelGrid>, stop_ui_rx: Receiver<()>) -> App {
+    pub fn new(
+        display: &'t RwLock<PixelGrid>,
+        luma: &'t RwLock<ByteGrid>,
+        stop_ui_rx: Receiver<()>,
+    ) -> Self {
         App {
             display,
+            luma,
             stop_ui_rx,
             pixels: None,
             window: None,
@@ -53,30 +59,32 @@ impl ApplicationHandler for App<'_> {
     }
 
     fn window_event(&mut self, event_loop: &ActiveEventLoop, _: WindowId, event: WindowEvent) {
-        trace!("event {:?}", event);
+        if self.stop_ui_rx.try_recv().is_ok() {
+            warn!("ui thread stop requested");
+            event_loop.exit();
+        }
+
         match event {
             WindowEvent::CloseRequested => {
                 warn!("The close button was pressed; stopping");
                 event_loop.exit();
             }
             WindowEvent::RedrawRequested => {
-                if self.stop_ui_rx.try_recv().is_ok() {
-                    warn!("ui thread stopping");
-                    event_loop.exit();
-                }
-
                 let window = self.window.as_ref().unwrap();
                 let pixels = self.pixels.as_mut().unwrap();
 
                 let mut frame = pixels.frame_mut().chunks_exact_mut(4);
 
                 let display = self.display.read().unwrap();
+                let luma = self.luma.read().unwrap();
 
-                for y in 0..PIXEL_HEIGHT {
-                    for x in 0..PIXEL_WIDTH {
-                        let is_set = display.get(x as usize, y as usize);
+                for y in 0..PIXEL_HEIGHT as usize {
+                    for x in 0..PIXEL_WIDTH as usize {
+                        let is_set = display.get(x , y );
+                        let brightness = luma.get(x / TILE_SIZE as usize, y / TILE_SIZE as usize);
+
                         let color = if is_set {
-                            [255u8, 255, 255, 255]
+                            [0u8, brightness, 0, 255]
                         } else {
                             [0u8, 0, 0, 255]
                         };
