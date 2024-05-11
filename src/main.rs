@@ -4,12 +4,12 @@ mod font;
 mod gui;
 
 use crate::font::BitmapFont;
-use crate::gui::App;
+use crate::gui::{App, AppEvents};
 use clap::Parser;
 use log::{debug, error, info, warn};
 use servicepoint2::{
-    ByteGrid, Command, Origin, Packet, PixelGrid, PIXEL_HEIGHT, PIXEL_WIDTH, TILE_HEIGHT,
-    TILE_SIZE, TILE_WIDTH,
+    ByteGrid, Command, Origin, Packet, PixelGrid, PIXEL_COUNT, PIXEL_HEIGHT, PIXEL_WIDTH,
+    TILE_HEIGHT, TILE_SIZE, TILE_WIDTH,
 };
 use std::io::ErrorKind;
 use std::net::UdpSocket;
@@ -45,12 +45,15 @@ fn main() {
     let luma_ref = &luma;
 
     let (stop_udp_tx, stop_udp_rx) = mpsc::channel();
-    let (stop_ui_tx, stop_ui_rx) = mpsc::channel();
 
-    let mut app = App::new(display_ref, luma_ref, stop_ui_rx, stop_udp_tx);
+    let mut app = App::new(display_ref, luma_ref, stop_udp_tx);
 
-    let event_loop = EventLoop::new().expect("could not create event loop");
-    event_loop.set_control_flow(ControlFlow::Poll);
+    let event_loop = EventLoop::with_user_event()
+        .build()
+        .expect("could not create event loop");
+    event_loop.set_control_flow(ControlFlow::Wait);
+
+    let event_proxy = event_loop.create_proxy();
 
     std::thread::scope(move |scope| {
         let udp_thread = scope.spawn(move || {
@@ -77,11 +80,18 @@ fn main() {
                 let package = servicepoint2::Packet::from(vec);
 
                 if !handle_package(package, &font, display_ref, luma_ref) {
-                    break; // hard reset
+                    // hard reset
+                    event_proxy
+                        .send_event(AppEvents::UdpThreadClosed)
+                        .expect("could not send close event");
+                    break;
                 }
-            }
 
-            stop_ui_tx.send(()).expect("could not stop ui thread");
+                event_proxy
+                    .send_event(AppEvents::UdpPacketHandled)
+                    .expect("could not send packet handled event");
+                std::thread::sleep(Duration::from_millis(1)); // give ui a change to get lock
+            }
         });
 
         event_loop
@@ -130,40 +140,44 @@ fn handle_package(
         }
         // TODO: how to deduplicate this code in a rusty way?
         Command::BitmapLinear(offset, vec) => {
+            if !check_bitmap_valid(offset, vec.len()) {
+                return true;
+            }
             let mut display = display_ref.write().unwrap();
             for bitmap_index in 0..vec.len() {
-                let pixel_index = offset as usize + bitmap_index;
-                let y = pixel_index / PIXEL_WIDTH as usize;
-                let x = pixel_index % PIXEL_WIDTH as usize;
+                let (x, y) = get_coordinates_for_index(offset as usize, bitmap_index);
                 display.set(x, y, vec.get(bitmap_index));
             }
         }
         Command::BitmapLinearAnd(offset, vec) => {
+            if !check_bitmap_valid(offset, vec.len()) {
+                return true;
+            }
             let mut display = display_ref.write().unwrap();
             for bitmap_index in 0..vec.len() {
-                let pixel_index = offset as usize + bitmap_index;
-                let y = pixel_index / PIXEL_WIDTH as usize;
-                let x = pixel_index % PIXEL_WIDTH as usize;
+                let (x, y) = get_coordinates_for_index(offset as usize, bitmap_index);
                 let old_value = display.get(x, y);
                 display.set(x, y, old_value && vec.get(bitmap_index));
             }
         }
         Command::BitmapLinearOr(offset, vec) => {
+            if !check_bitmap_valid(offset, vec.len()) {
+                return true;
+            }
             let mut display = display_ref.write().unwrap();
             for bitmap_index in 0..vec.len() {
-                let pixel_index = offset as usize + bitmap_index;
-                let y = pixel_index / PIXEL_WIDTH as usize;
-                let x = pixel_index % PIXEL_WIDTH as usize;
+                let (x, y) = get_coordinates_for_index(offset as usize, bitmap_index);
                 let old_value = display.get(x, y);
                 display.set(x, y, old_value || vec.get(bitmap_index));
             }
         }
         Command::BitmapLinearXor(offset, vec) => {
+            if !check_bitmap_valid(offset, vec.len()) {
+                return true;
+            }
             let mut display = display_ref.write().unwrap();
             for bitmap_index in 0..vec.len() {
-                let pixel_index = offset as usize + bitmap_index;
-                let y = pixel_index / PIXEL_WIDTH as usize;
-                let x = pixel_index % PIXEL_WIDTH as usize;
+                let (x, y) = get_coordinates_for_index(offset as usize, bitmap_index);
                 let old_value = display.get(x, y);
                 display.set(x, y, old_value ^ vec.get(bitmap_index));
             }
@@ -188,6 +202,18 @@ fn handle_package(
             error!("command not implemented: {command:?}")
         }
     };
+
+    true
+}
+
+fn check_bitmap_valid(offset: u16, payload_len: usize) -> bool {
+    if offset as usize + payload_len > PIXEL_COUNT {
+        error!(
+            "bitmap with offset {offset} is too big ({} bytes)",
+            payload_len
+        );
+        return false;
+    }
 
     true
 }
@@ -233,4 +259,12 @@ fn print_pixel_grid(
             display.set(offset_x + inner_x, offset_y + inner_y, is_set);
         }
     }
+}
+
+fn get_coordinates_for_index(offset: usize, index: usize) -> (usize, usize) {
+    let pixel_index = offset + index;
+    (
+        pixel_index % PIXEL_WIDTH as usize,
+        pixel_index / PIXEL_WIDTH as usize,
+    )
 }

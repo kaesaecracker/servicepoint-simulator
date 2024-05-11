@@ -2151,7 +2151,7 @@ dependencies = [
 [[package]]
 name = "servicepoint2"
 version = "0.1.0"
-source = "git+https://github.com/kaesaecracker/servicepoint.git#27f891cd921821400b4ae69e02986bf5ed2687b8"
+source = "git+https://github.com/kaesaecracker/servicepoint.git#35ae1f20ce52e36c6fbb94c74d183dda0cc1a0af"
 dependencies = [
  "log",
  "num",
