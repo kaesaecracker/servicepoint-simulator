@@ -1,9 +1,12 @@
+use std::sync::mpsc::Sender;
+use std::sync::RwLock;
+
 use log::{info, warn};
 use pixels::wgpu::TextureFormat;
 use pixels::{Pixels, PixelsBuilder, SurfaceTexture};
-use servicepoint2::{ByteGrid, PixelGrid, PIXEL_HEIGHT, PIXEL_WIDTH, TILE_SIZE};
-use std::sync::mpsc::Sender;
-use std::sync::RwLock;
+use servicepoint2::{
+    ByteGrid, PixelGrid, PIXEL_HEIGHT, PIXEL_WIDTH, TILE_SIZE,
+};
 use winit::application::ApplicationHandler;
 use winit::dpi::{LogicalSize, Size};
 use winit::event::WindowEvent;
@@ -42,7 +45,10 @@ impl<'t> App<'t> {
 
 impl ApplicationHandler<AppEvents> for App<'_> {
     fn resumed(&mut self, event_loop: &ActiveEventLoop) {
-        let size = Size::from(LogicalSize::new(PIXEL_WIDTH as f64, PIXEL_HEIGHT as f64));
+        let size = Size::from(LogicalSize::new(
+            PIXEL_WIDTH as f64,
+            PIXEL_HEIGHT as f64,
+        ));
         let attributes = Window::default_attributes()
             .with_title("pixel-receiver-rs")
             .with_inner_size(size);
@@ -53,13 +59,20 @@ impl ApplicationHandler<AppEvents> for App<'_> {
 
         self.pixels = {
             let window_size = window.inner_size();
-            let surface_texture =
-                SurfaceTexture::new(window_size.width, window_size.height, &window);
+            let surface_texture = SurfaceTexture::new(
+                window_size.width,
+                window_size.height,
+                &window,
+            );
             Some(
-                PixelsBuilder::new(PIXEL_WIDTH as u32, PIXEL_HEIGHT as u32, surface_texture)
-                    .render_texture_format(TextureFormat::Bgra8UnormSrgb)
-                    .build()
-                    .expect("could not create pixels"),
+                PixelsBuilder::new(
+                    PIXEL_WIDTH as u32,
+                    PIXEL_HEIGHT as u32,
+                    surface_texture,
+                )
+                .render_texture_format(TextureFormat::Bgra8UnormSrgb)
+                .build()
+                .expect("could not create pixels"),
             )
         };
     }
@@ -78,7 +91,12 @@ impl ApplicationHandler<AppEvents> for App<'_> {
         }
     }
 
-    fn window_event(&mut self, event_loop: &ActiveEventLoop, _: WindowId, event: WindowEvent) {
+    fn window_event(
+        &mut self,
+        event_loop: &ActiveEventLoop,
+        _: WindowId,
+        event: WindowEvent,
+    ) {
         if event == WindowEvent::CloseRequested {
             warn!("window event cloe requested");
             self.window = None;
@@ -100,7 +118,8 @@ impl ApplicationHandler<AppEvents> for App<'_> {
         for y in 0..PIXEL_HEIGHT as usize {
             for x in 0..PIXEL_WIDTH as usize {
                 let is_set = display.get(x, y);
-                let brightness = luma.get(x / TILE_SIZE as usize, y / TILE_SIZE as usize);
+                let brightness =
+                    luma.get(x / TILE_SIZE as usize, y / TILE_SIZE as usize);
 
                 let color = if is_set {
                     [0u8, brightness, 0, 255]

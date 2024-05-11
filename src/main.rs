@@ -1,21 +1,23 @@
 #![deny(clippy::all)]
 
-mod font;
-mod gui;
-
-use crate::font::BitmapFont;
-use crate::gui::{App, AppEvents};
-use clap::Parser;
-use log::{debug, error, info, warn};
-use servicepoint2::{
-    ByteGrid, Command, Origin, Packet, PixelGrid, PIXEL_COUNT, PIXEL_HEIGHT, PIXEL_WIDTH,
-    TILE_HEIGHT, TILE_SIZE, TILE_WIDTH,
-};
 use std::io::ErrorKind;
 use std::net::UdpSocket;
 use std::sync::{mpsc, RwLock, RwLockWriteGuard};
 use std::time::Duration;
+
+use clap::Parser;
+use log::{debug, error, info, warn};
+use servicepoint2::{
+    ByteGrid, Command, Origin, Packet, PixelGrid, PIXEL_COUNT, PIXEL_HEIGHT,
+    PIXEL_WIDTH, TILE_HEIGHT, TILE_SIZE, TILE_WIDTH,
+};
 use winit::event_loop::{ControlFlow, EventLoop};
+
+use crate::font::BitmapFont;
+use crate::gui::{App, AppEvents};
+
+mod font;
+mod gui;
 
 #[derive(Parser, Debug)]
 struct Cli {
@@ -36,7 +38,10 @@ fn main() {
 
     let font = BitmapFont::load_file("Web437_IBM_BIOS.woff");
 
-    let display = RwLock::new(PixelGrid::new(PIXEL_WIDTH as usize, PIXEL_HEIGHT as usize));
+    let display = RwLock::new(PixelGrid::new(
+        PIXEL_WIDTH as usize,
+        PIXEL_HEIGHT as usize,
+    ));
     let display_ref = &display;
 
     let mut luma = ByteGrid::new(TILE_WIDTH as usize, TILE_HEIGHT as usize);
@@ -144,7 +149,8 @@ fn handle_package(
             }
             let mut display = display_ref.write().unwrap();
             for bitmap_index in 0..vec.len() {
-                let (x, y) = get_coordinates_for_index(offset as usize, bitmap_index);
+                let (x, y) =
+                    get_coordinates_for_index(offset as usize, bitmap_index);
                 display.set(x, y, vec.get(bitmap_index));
             }
         }
@@ -154,7 +160,8 @@ fn handle_package(
             }
             let mut display = display_ref.write().unwrap();
             for bitmap_index in 0..vec.len() {
-                let (x, y) = get_coordinates_for_index(offset as usize, bitmap_index);
+                let (x, y) =
+                    get_coordinates_for_index(offset as usize, bitmap_index);
                 let old_value = display.get(x, y);
                 display.set(x, y, old_value && vec.get(bitmap_index));
             }
@@ -165,7 +172,8 @@ fn handle_package(
             }
             let mut display = display_ref.write().unwrap();
             for bitmap_index in 0..vec.len() {
-                let (x, y) = get_coordinates_for_index(offset as usize, bitmap_index);
+                let (x, y) =
+                    get_coordinates_for_index(offset as usize, bitmap_index);
                 let old_value = display.get(x, y);
                 display.set(x, y, old_value || vec.get(bitmap_index));
             }
@@ -176,7 +184,8 @@ fn handle_package(
             }
             let mut display = display_ref.write().unwrap();
             for bitmap_index in 0..vec.len() {
-                let (x, y) = get_coordinates_for_index(offset as usize, bitmap_index);
+                let (x, y) =
+                    get_coordinates_for_index(offset as usize, bitmap_index);
                 let old_value = display.get(x, y);
                 display.set(x, y, old_value ^ vec.get(bitmap_index));
             }
@@ -190,7 +199,11 @@ fn handle_package(
             for inner_y in 0..grid.height {
                 for inner_x in 0..grid.width {
                     let brightness = grid.get(inner_x, inner_y);
-                    luma.set(offset_x + inner_x, offset_y + inner_y, brightness);
+                    luma.set(
+                        offset_x + inner_x,
+                        offset_y + inner_y,
+                        brightness,
+                    );
                 }
             }
         }

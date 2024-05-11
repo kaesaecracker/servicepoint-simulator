@@ -10,10 +10,12 @@ pub struct BitmapFont {
 
 impl BitmapFont {
     pub fn load_file(file: &str) -> BitmapFont {
-        let font = font_kit::font::Font::from_path(file, 0).expect("could not load font");
+        let font = font_kit::font::Font::from_path(file, 0)
+            .expect("could not load font");
 
-        let mut bitmaps =
-            core::array::from_fn(|_| PixelGrid::new(TILE_SIZE as usize, TILE_SIZE as usize));
+        let mut bitmaps = core::array::from_fn(|_| {
+            PixelGrid::new(TILE_SIZE as usize, TILE_SIZE as usize)
+        });
 
         for char_code in u8::MIN..u8::MAX {
             let char = char_code as char;
@@ -24,7 +26,8 @@ impl BitmapFont {
 
             let size = 8f32;
             let transform = Transform2F::default();
-            let mut canvas = Canvas::new(vec2i(size as i32, size as i32), Format::A8);
+            let mut canvas =
+                Canvas::new(vec2i(size as i32, size as i32), Format::A8);
             font.rasterize_glyph(
                 &mut canvas,
                 glyph_id,
