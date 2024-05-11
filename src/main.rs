@@ -44,10 +44,15 @@ fn main() {
     let luma = RwLock::new(luma);
     let luma_ref = &luma;
 
-    std::thread::scope(move |scope| {
-        let (stop_udp_tx, stop_udp_rx) = mpsc::channel();
-        let (stop_ui_tx, stop_ui_rx) = mpsc::channel();
+    let (stop_udp_tx, stop_udp_rx) = mpsc::channel();
+    let (stop_ui_tx, stop_ui_rx) = mpsc::channel();
 
+    let mut app = App::new(display_ref, luma_ref, stop_ui_rx, stop_udp_tx);
+
+    let event_loop = EventLoop::new().expect("could not create event loop");
+    event_loop.set_control_flow(ControlFlow::Poll);
+
+    std::thread::scope(move |scope| {
         let udp_thread = scope.spawn(move || {
             let mut buf = [0; 8985];
 
@@ -71,22 +76,17 @@ fn main() {
                 let vec = buf[..amount].to_vec();
                 let package = servicepoint2::Packet::from(vec);
 
-                handle_package(package, &font, display_ref, luma_ref);
+                if !handle_package(package, &font, display_ref, luma_ref) {
+                    break; // hard reset
+                }
             }
 
             stop_ui_tx.send(()).expect("could not stop ui thread");
         });
 
-        let mut app = App::new(display_ref, luma_ref, stop_ui_rx);
-
-        let event_loop = EventLoop::new().expect("could not create event loop");
-        event_loop.set_control_flow(ControlFlow::Poll);
-
         event_loop
             .run_app(&mut app)
             .expect("could not run event loop");
-
-        stop_udp_tx.send(()).expect("could not stop udp thread");
 
         udp_thread.join().expect("could not join udp thread");
     });
@@ -97,15 +97,16 @@ fn handle_package(
     font: &BitmapFont,
     display_ref: &RwLock<PixelGrid>,
     luma_ref: &RwLock<ByteGrid>,
-) {
+) -> bool {
     let command = match Command::try_from(received) {
         Err(err) => {
             warn!("could not read command for packet: {:?}", err);
-            return;
+            return true;
         }
         Ok(val) => val,
     };
 
+    debug!("received {command:?}");
     match command {
         Command::Clear => {
             info!("clearing display");
@@ -113,7 +114,7 @@ fn handle_package(
         }
         Command::HardReset => {
             warn!("display shutting down");
-            return;
+            return false;
         }
         Command::BitmapLinearWin(Origin(x, y), pixels) => {
             let mut display = display_ref.write().unwrap();
@@ -187,6 +188,8 @@ fn handle_package(
             error!("command not implemented: {command:?}")
         }
     };
+
+    true
 }
 
 fn print_cp437_data(
