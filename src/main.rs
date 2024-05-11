@@ -90,7 +90,6 @@ fn main() {
                 event_proxy
                     .send_event(AppEvents::UdpPacketHandled)
                     .expect("could not send packet handled event");
-                std::thread::sleep(Duration::from_millis(1)); // give ui a change to get lock
             }
         });
 
@@ -139,7 +138,7 @@ fn handle_package(
             warn!("ignoring deprecated command {:?}", command);
         }
         // TODO: how to deduplicate this code in a rusty way?
-        Command::BitmapLinear(offset, vec) => {
+        Command::BitmapLinear(offset, vec, _) => {
             if !check_bitmap_valid(offset, vec.len()) {
                 return true;
             }
@@ -149,7 +148,7 @@ fn handle_package(
                 display.set(x, y, vec.get(bitmap_index));
             }
         }
-        Command::BitmapLinearAnd(offset, vec) => {
+        Command::BitmapLinearAnd(offset, vec, _) => {
             if !check_bitmap_valid(offset, vec.len()) {
                 return true;
             }
@@ -160,7 +159,7 @@ fn handle_package(
                 display.set(x, y, old_value && vec.get(bitmap_index));
             }
         }
-        Command::BitmapLinearOr(offset, vec) => {
+        Command::BitmapLinearOr(offset, vec, _) => {
             if !check_bitmap_valid(offset, vec.len()) {
                 return true;
             }
@@ -171,7 +170,7 @@ fn handle_package(
                 display.set(x, y, old_value || vec.get(bitmap_index));
             }
         }
-        Command::BitmapLinearXor(offset, vec) => {
+        Command::BitmapLinearXor(offset, vec, _) => {
             if !check_bitmap_valid(offset, vec.len()) {
                 return true;
             }
