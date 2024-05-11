@@ -18,5 +18,4 @@ num-traits = "0.2"
 font-kit = { version = "0.13.0", features = ["loader-freetype-default", "loader-freetype"], default-features = false }
 pathfinder_geometry = "0.5.1"
 yeslogic-fontconfig-sys = { version = "5.0", features = ["dlopen"] }
-# servicepoint2 = { path = "../servicepoint2" }
 servicepoint2 = { git = "https://github.com/kaesaecracker/servicepoint.git" }
