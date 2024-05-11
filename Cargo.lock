@@ -2191,9 +2191,9 @@ dependencies = [
 
 [[package]]
 name = "servicepoint2"
-version = "0.1.0"
+version = "0.1.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "13bfdac02a67eb764896a70fbb5dbb50acb66d8a130d866a3de6558b1779a746"
+checksum = "ff3f24a6ee5fa2b73d57b78d8d35efefb9397d0ea012978fe52b396f601e8948"
 dependencies = [
  "bzip2",
  "flate2",

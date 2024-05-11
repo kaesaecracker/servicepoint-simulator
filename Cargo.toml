@@ -3,6 +3,7 @@ name = "pixel-receiver-rs"
 version = "0.1.0"
 edition = "2021"
 publish = false
+license = "GPL-3.0-or-later"
 
 [dependencies]
 clap = { version = "4.5", features = ["derive"] }
@@ -18,4 +19,4 @@ num-traits = "0.2"
 font-kit = { version = "0.13.0", features = ["loader-freetype-default", "loader-freetype"], default-features = false }
 pathfinder_geometry = "0.5.1"
 yeslogic-fontconfig-sys = { version = "5.0", features = ["dlopen"] }
-servicepoint2 = "0.1"
+servicepoint2 = "0.1.3"
