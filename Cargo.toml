@@ -6,17 +6,19 @@ publish = false
 license = "GPL-3.0-or-later"
 
 [dependencies]
-clap = { version = "4.5", features = ["derive"] }
-image = "0.25"
-pixels = "0.13"
-winit = { version = "0.30", features = ["rwh_05"] }
-log = "0.4"
-raw-window-handle = "0.6"
-env_logger = "0.11"
-num = "0.4"
-num-derive = "0.4"
-num-traits = "0.2"
-font-kit = { version = "0.13.0", features = ["loader-freetype-default", "loader-freetype"], default-features = false }
-pathfinder_geometry = "0.5.1"
-yeslogic-fontconfig-sys = { version = "5.0", features = ["dlopen"] }
+# packet parsing
 servicepoint2 = "0.1.3"
+
+# gui
+winit = { version = "0.30", features = ["rwh_05"] } # for creating a window
+pixels = "0.13" # for drawing pixels onto the surface of the window
+
+# font rendering
+font-kit = { version = "0.13.0", features = ["loader-freetype-default", "source-fontconfig-dlopen"], default-features = false }
+# I should not need this as a direct dependency, but then I cannot spell the types needed to use font-kit...
+pathfinder_geometry = "0.5.1"
+
+# basics
+log = "0.4"
+env_logger = "0.11"
+clap = { version = "4.5", features = ["derive"] }
