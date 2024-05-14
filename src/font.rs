@@ -36,7 +36,7 @@ impl BitmapFont {
                 HintingOptions::None,
                 RasterizationOptions::GrayscaleAa,
             )
-            .unwrap();
+                .unwrap();
 
             assert_eq!(canvas.pixels.len(), 64);
             assert_eq!(canvas.stride, 8);

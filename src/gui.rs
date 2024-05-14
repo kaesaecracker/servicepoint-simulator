@@ -2,10 +2,10 @@ use std::sync::mpsc::Sender;
 use std::sync::RwLock;
 
 use log::{info, warn};
-use pixels::wgpu::TextureFormat;
 use pixels::{Pixels, PixelsBuilder, SurfaceTexture};
+use pixels::wgpu::TextureFormat;
 use servicepoint2::{
-    ByteGrid, PixelGrid, PIXEL_HEIGHT, PIXEL_WIDTH, TILE_SIZE,
+    ByteGrid, PIXEL_HEIGHT, PIXEL_WIDTH, PixelGrid, TILE_SIZE,
 };
 use winit::application::ApplicationHandler;
 use winit::dpi::{LogicalSize, Size};
@@ -19,7 +19,10 @@ pub struct App<'t> {
     window: Option<Window>,
     pixels: Option<Pixels>,
     stop_udp_tx: Sender<()>,
+    spacers: bool,
 }
+
+const SPACER_HEIGHT: u16 = 4;
 
 #[derive(Debug)]
 pub enum AppEvents {
@@ -32,6 +35,7 @@ impl<'t> App<'t> {
         display: &'t RwLock<PixelGrid>,
         luma: &'t RwLock<ByteGrid>,
         stop_udp_tx: Sender<()>,
+        spacers: bool,
     ) -> Self {
         App {
             display,
@@ -39,42 +43,44 @@ impl<'t> App<'t> {
             stop_udp_tx,
             pixels: None,
             window: None,
+            spacers,
         }
     }
 }
 
 impl ApplicationHandler<AppEvents> for App<'_> {
     fn resumed(&mut self, event_loop: &ActiveEventLoop) {
-        let size = Size::from(LogicalSize::new(
-            PIXEL_WIDTH as f64,
-            PIXEL_HEIGHT as f64,
-        ));
+        let height = if self.spacers {
+            let num_spacers = (PIXEL_HEIGHT / TILE_SIZE) - 1;
+            PIXEL_HEIGHT + num_spacers * SPACER_HEIGHT
+        } else {
+            PIXEL_HEIGHT
+        } as f64;
+
+        let size = Size::from(LogicalSize::new(PIXEL_WIDTH as f64, height));
         let attributes = Window::default_attributes()
-            .with_title("pixel-receiver-rs")
+            .with_title("servicepoint-simulator")
             .with_inner_size(size);
 
         let window = event_loop.create_window(attributes).unwrap();
         self.window = Some(window);
         let window = self.window.as_ref().unwrap();
 
-        self.pixels = {
+        self.pixels = Some({
             let window_size = window.inner_size();
-            let surface_texture = SurfaceTexture::new(
+            PixelsBuilder::new(
                 window_size.width,
                 window_size.height,
-                &window,
-            );
-            Some(
-                PixelsBuilder::new(
-                    PIXEL_WIDTH as u32,
-                    PIXEL_HEIGHT as u32,
-                    surface_texture,
-                )
+                SurfaceTexture::new(
+                    window_size.width,
+                    window_size.height,
+                    &window,
+                ),
+            )
                 .render_texture_format(TextureFormat::Bgra8UnormSrgb)
                 .build()
-                .expect("could not create pixels"),
-            )
-        };
+                .expect("could not create pixels")
+        });
     }
 
     fn user_event(&mut self, event_loop: &ActiveEventLoop, event: AppEvents) {
@@ -116,6 +122,13 @@ impl ApplicationHandler<AppEvents> for App<'_> {
         let luma = self.luma.read().unwrap();
 
         for y in 0..PIXEL_HEIGHT as usize {
+            if self.spacers && y != 0 && y % TILE_SIZE as usize == 0 {
+                // cannot just frame.skip(PIXEL_WIDTH as usize * SPACER_HEIGHT as usize) because of typing
+                for _ in 0..PIXEL_WIDTH as usize * SPACER_HEIGHT as usize {
+                    frame.next().unwrap();
+                }
+            }
+
             for x in 0..PIXEL_WIDTH as usize {
                 let is_set = display.get(x, y);
                 let brightness =

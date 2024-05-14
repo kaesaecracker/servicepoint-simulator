@@ -8,8 +8,8 @@ use std::time::Duration;
 use clap::Parser;
 use log::{debug, error, info, warn};
 use servicepoint2::{
-    ByteGrid, Command, Origin, Packet, PixelGrid, PIXEL_COUNT, PIXEL_HEIGHT,
-    PIXEL_WIDTH, TILE_HEIGHT, TILE_SIZE, TILE_WIDTH,
+    ByteGrid, Command, Origin, Packet, PIXEL_COUNT, PIXEL_HEIGHT, PIXEL_WIDTH,
+    PixelGrid, TILE_HEIGHT, TILE_SIZE, TILE_WIDTH,
 };
 use winit::event_loop::{ControlFlow, EventLoop};
 
@@ -21,8 +21,10 @@ mod gui;
 
 #[derive(Parser, Debug)]
 struct Cli {
-    #[arg(long, default_value = "0.0.0.0:2342")]
+    #[arg(short, long, default_value = "0.0.0.0:2342")]
     bind: String,
+    #[arg(short, long, default_value_t = false)]
+    spacers: bool,
 }
 
 fn main() {
@@ -51,7 +53,7 @@ fn main() {
 
     let (stop_udp_tx, stop_udp_rx) = mpsc::channel();
 
-    let mut app = App::new(display_ref, luma_ref, stop_udp_tx);
+    let mut app = App::new(display_ref, luma_ref, stop_udp_tx, cli.spacers);
 
     let event_loop = EventLoop::with_user_event()
         .build()
@@ -237,12 +239,15 @@ fn print_cp437_data(
     display: &mut RwLockWriteGuard<PixelGrid>,
 ) {
     let Origin(x, y) = origin;
+    let x = x as usize;
+    let y = y as usize;
+
     for char_y in 0usize..grid.height {
         for char_x in 0usize..grid.width {
             let char_code = grid.get(char_x, char_y);
 
-            let tile_x = char_x + x as usize;
-            let tile_y = char_y + y as usize;
+            let tile_x = char_x + x;
+            let tile_y = char_y + y;
 
             let bitmap = font.get_bitmap(char_code);
             print_pixel_grid(
