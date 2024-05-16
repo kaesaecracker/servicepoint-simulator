@@ -2,7 +2,7 @@ use std::sync::{RwLock, RwLockWriteGuard};
 
 use log::{debug, error, info, warn};
 use servicepoint2::{
-    ByteGrid, Command, Origin, PIXEL_COUNT, PIXEL_WIDTH, PixelGrid, TILE_SIZE,
+    ByteGrid, Command, Origin, PixelGrid, PIXEL_COUNT, PIXEL_WIDTH, TILE_SIZE,
 };
 
 use crate::font::BitmapFont;

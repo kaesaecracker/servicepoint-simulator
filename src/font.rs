@@ -1,4 +1,4 @@
-use font_kit::canvas::*;
+use font_kit::canvas::{Canvas, Format, RasterizationOptions};
 use font_kit::hinting::HintingOptions;
 use pathfinder_geometry::transform2d::Transform2F;
 use pathfinder_geometry::vector::{vec2f, vec2i};
@@ -36,7 +36,7 @@ impl BitmapFont {
                 HintingOptions::None,
                 RasterizationOptions::GrayscaleAa,
             )
-                .unwrap();
+            .unwrap();
 
             assert_eq!(canvas.pixels.len(), 64);
             assert_eq!(canvas.stride, 8);

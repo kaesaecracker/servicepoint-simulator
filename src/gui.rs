@@ -2,10 +2,10 @@ use std::sync::mpsc::Sender;
 use std::sync::RwLock;
 
 use log::{info, warn};
-use pixels::{Pixels, PixelsBuilder, SurfaceTexture};
 use pixels::wgpu::TextureFormat;
+use pixels::{Pixels, PixelsBuilder, SurfaceTexture};
 use servicepoint2::{
-    ByteGrid, PIXEL_HEIGHT, PIXEL_WIDTH, PixelGrid, TILE_SIZE,
+    ByteGrid, PixelGrid, PIXEL_HEIGHT, PIXEL_WIDTH, TILE_SIZE,
 };
 use winit::application::ApplicationHandler;
 use winit::dpi::{LogicalSize, Size};
@@ -77,9 +77,9 @@ impl ApplicationHandler<AppEvents> for App<'_> {
                     &window,
                 ),
             )
-                .render_texture_format(TextureFormat::Bgra8UnormSrgb)
-                .build()
-                .expect("could not create pixels")
+            .render_texture_format(TextureFormat::Bgra8UnormSrgb)
+            .build()
+            .expect("could not create pixels")
         });
     }
 

@@ -8,7 +8,7 @@ use std::time::Duration;
 use clap::Parser;
 use log::{info, warn};
 use servicepoint2::{
-    ByteGrid, Command, PIXEL_HEIGHT, PIXEL_WIDTH, PixelGrid, TILE_HEIGHT,
+    ByteGrid, Command, PixelGrid, PIXEL_HEIGHT, PIXEL_WIDTH, TILE_HEIGHT,
     TILE_WIDTH,
 };
 use winit::event_loop::{ControlFlow, EventLoop};
