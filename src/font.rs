@@ -50,7 +50,7 @@ impl BitmapFont {
             }
         }
 
-        return BitmapFont { bitmaps };
+        BitmapFont { bitmaps }
     }
 
     pub fn get_bitmap(&self, char_code: u8) -> &PixelGrid {
