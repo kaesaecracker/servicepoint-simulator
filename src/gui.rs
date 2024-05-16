@@ -2,10 +2,10 @@ use std::sync::mpsc::Sender;
 use std::sync::RwLock;
 
 use log::{info, warn};
-use pixels::wgpu::TextureFormat;
 use pixels::{Pixels, PixelsBuilder, SurfaceTexture};
+use pixels::wgpu::TextureFormat;
 use servicepoint2::{
-    ByteGrid, PixelGrid, PIXEL_HEIGHT, PIXEL_WIDTH, TILE_SIZE,
+    ByteGrid, PIXEL_HEIGHT, PIXEL_WIDTH, PixelGrid, TILE_SIZE,
 };
 use winit::application::ApplicationHandler;
 use winit::dpi::{LogicalSize, Size};
@@ -13,13 +13,15 @@ use winit::event::WindowEvent;
 use winit::event_loop::ActiveEventLoop;
 use winit::window::{Window, WindowId};
 
+use crate::Cli;
+
 pub struct App<'t> {
     display: &'t RwLock<PixelGrid>,
     luma: &'t RwLock<ByteGrid>,
     window: Option<Window>,
     pixels: Option<Pixels>,
     stop_udp_tx: Sender<()>,
-    spacers: bool,
+    cli: &'t Cli,
 }
 
 const SPACER_HEIGHT: u16 = 4;
@@ -35,7 +37,7 @@ impl<'t> App<'t> {
         display: &'t RwLock<PixelGrid>,
         luma: &'t RwLock<ByteGrid>,
         stop_udp_tx: Sender<()>,
-        spacers: bool,
+        cli: &'t Cli,
     ) -> Self {
         App {
             display,
@@ -43,14 +45,14 @@ impl<'t> App<'t> {
             stop_udp_tx,
             pixels: None,
             window: None,
-            spacers,
+            cli,
         }
     }
 }
 
 impl ApplicationHandler<AppEvents> for App<'_> {
     fn resumed(&mut self, event_loop: &ActiveEventLoop) {
-        let height = if self.spacers {
+        let height = if self.cli.spacers {
             let num_spacers = (PIXEL_HEIGHT / TILE_SIZE) - 1;
             PIXEL_HEIGHT + num_spacers * SPACER_HEIGHT
         } else {
@@ -122,7 +124,7 @@ impl ApplicationHandler<AppEvents> for App<'_> {
         let luma = self.luma.read().unwrap();
 
         for y in 0..PIXEL_HEIGHT as usize {
-            if self.spacers && y != 0 && y % TILE_SIZE as usize == 0 {
+            if self.cli.spacers && y != 0 && y % TILE_SIZE as usize == 0 {
                 // cannot just frame.skip(PIXEL_WIDTH as usize * SPACER_HEIGHT as usize) because of typing
                 for _ in 0..PIXEL_WIDTH as usize * SPACER_HEIGHT as usize {
                     frame.next().unwrap();
@@ -135,7 +137,12 @@ impl ApplicationHandler<AppEvents> for App<'_> {
                     luma.get(x / TILE_SIZE as usize, y / TILE_SIZE as usize);
 
                 let color = if is_set {
-                    [0u8, brightness, 0, 255]
+                    [
+                        if self.cli.red { brightness } else { 0u8 },
+                        if self.cli.green { brightness } else { 0u8 },
+                        if self.cli.blue { brightness } else { 0u8 },
+                        255,
+                    ]
                 } else {
                     [0u8, 0, 0, 255]
                 };

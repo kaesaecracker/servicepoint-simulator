@@ -23,19 +23,28 @@ mod gui;
 
 #[derive(Parser, Debug)]
 struct Cli {
-    #[arg(short, long, default_value = "0.0.0.0:2342")]
+    #[arg(long, default_value = "0.0.0.0:2342")]
     bind: String,
     #[arg(short, long, default_value_t = false)]
     spacers: bool,
+    #[arg(short, long, default_value_t = false)]
+    red: bool,
+    #[arg(short, long, default_value_t = false)]
+    green: bool,
+    #[arg(short, long, default_value_t = false)]
+    blue: bool,
 }
 
 fn main() {
     env_logger::init();
 
-    let cli = Cli::parse();
-    info!("starting with args: {:?}", &cli);
+    let mut cli = Cli::parse();
+    if !(cli.red || cli.blue || cli.green) {
+        cli.green = true;
+    }
 
-    let socket = UdpSocket::bind(cli.bind).expect("could not bind socket");
+    info!("starting with args: {:?}", &cli);
+    let socket = UdpSocket::bind(&cli.bind).expect("could not bind socket");
     socket
         .set_nonblocking(true)
         .expect("could not enter non blocking mode");
@@ -46,16 +55,24 @@ fn main() {
         PIXEL_WIDTH as usize,
         PIXEL_HEIGHT as usize,
     ));
-    let display_ref = &display;
 
     let mut luma = ByteGrid::new(TILE_WIDTH as usize, TILE_HEIGHT as usize);
     luma.fill(u8::MAX);
     let luma = RwLock::new(luma);
-    let luma_ref = &luma;
 
+    run(&display, &luma, socket, font, &cli);
+}
+
+fn run(
+    display_ref: &RwLock<PixelGrid>,
+    luma_ref: &RwLock<ByteGrid>,
+    socket: UdpSocket,
+    font: BitmapFont,
+    cli: &Cli,
+) {
     let (stop_udp_tx, stop_udp_rx) = mpsc::channel();
 
-    let mut app = App::new(display_ref, luma_ref, stop_udp_tx, cli.spacers);
+    let mut app = App::new(display_ref, luma_ref, stop_udp_tx, cli);
 
     let event_loop = EventLoop::with_user_event()
         .build()
