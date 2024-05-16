@@ -23,7 +23,7 @@ pub(crate) fn execute_command(
             warn!("display shutting down");
             return false;
         }
-        Command::BitmapLinearWin(Origin(x, y), pixels) => {
+        Command::BitmapLinearWin(Origin(x, y), pixels, _) => {
             let mut display = display_ref.write().unwrap();
             print_pixel_grid(x as usize, y as usize, &pixels, &mut display);
         }

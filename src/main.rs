@@ -8,7 +8,7 @@ use std::time::Duration;
 use clap::Parser;
 use log::{info, warn};
 use servicepoint2::{
-    ByteGrid, Command, PixelGrid, PIXEL_HEIGHT, PIXEL_WIDTH, TILE_HEIGHT,
+    ByteGrid, Command, PIXEL_HEIGHT, PIXEL_WIDTH, PixelGrid, TILE_HEIGHT,
     TILE_WIDTH,
 };
 use winit::event_loop::{ControlFlow, EventLoop};
@@ -102,8 +102,13 @@ fn run(
                     );
                 }
 
-                let vec = buf[..amount].to_vec();
-                let package = servicepoint2::Packet::from(vec);
+                let package = match servicepoint2::Packet::try_from(&buf[..amount]) {
+                    Err(_) =>  {
+                        warn!("could not load packet with length {amount} into header");
+                        continue;
+                    }
+                    Ok(package) => package,
+                };
 
                 let command = match Command::try_from(package) {
                     Err(err) => {
