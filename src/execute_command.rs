@@ -2,7 +2,7 @@ use std::sync::{RwLock, RwLockWriteGuard};
 
 use log::{debug, error, info, warn};
 use servicepoint2::{
-    ByteGrid, Command, Origin, PixelGrid, PIXEL_COUNT, PIXEL_WIDTH, TILE_SIZE,
+    ByteGrid, Command, Origin, PIXEL_COUNT, PIXEL_WIDTH, PixelGrid, TILE_SIZE,
 };
 
 use crate::font::BitmapFont;
@@ -89,8 +89,8 @@ pub(crate) fn execute_command(
             let offset_y = offset_y as usize;
 
             let mut luma = luma_ref.write().unwrap();
-            for inner_y in 0..grid.height {
-                for inner_x in 0..grid.width {
+            for inner_y in 0..grid.height() {
+                for inner_x in 0..grid.width() {
                     let brightness = grid.get(inner_x, inner_y);
                     luma.set(
                         offset_x + inner_x,
@@ -133,8 +133,8 @@ fn print_cp437_data(
     let x = x as usize;
     let y = y as usize;
 
-    for char_y in 0usize..grid.height {
-        for char_x in 0usize..grid.width {
+    for char_y in 0usize..grid.height() {
+        for char_x in 0usize..grid.width() {
             let char_code = grid.get(char_x, char_y);
 
             let tile_x = char_x + x;
@@ -159,10 +159,11 @@ fn print_pixel_grid(
 ) {
     debug!(
         "printing {}x{} grid at {offset_x} {offset_y}",
-        pixels.width, pixels.height
+        pixels.width(),
+        pixels.height()
     );
-    for inner_y in 0..pixels.height {
-        for inner_x in 0..pixels.width {
+    for inner_y in 0..pixels.height() {
+        for inner_x in 0..pixels.width() {
             let is_set = pixels.get(inner_x, inner_y);
             display.set(offset_x + inner_x, offset_y + inner_y, is_set);
         }
