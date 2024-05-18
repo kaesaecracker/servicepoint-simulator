@@ -141,12 +141,15 @@ fn print_cp437_data(
             let tile_y = char_y + y;
 
             let bitmap = font.get_bitmap(char_code);
-            print_pixel_grid(
+            if !print_pixel_grid(
                 tile_x * TILE_SIZE as usize,
                 tile_y * TILE_SIZE as usize,
                 bitmap,
                 display,
-            );
+            ) {
+                error!("stopping drawing text because char draw failed");
+                return;
+            }
         }
     }
 }
@@ -156,7 +159,7 @@ fn print_pixel_grid(
     offset_y: usize,
     pixels: &PixelGrid,
     display: &mut RwLockWriteGuard<PixelGrid>,
-) {
+) -> bool {
     debug!(
         "printing {}x{} grid at {offset_x} {offset_y}",
         pixels.width(),
@@ -165,9 +168,19 @@ fn print_pixel_grid(
     for inner_y in 0..pixels.height() {
         for inner_x in 0..pixels.width() {
             let is_set = pixels.get(inner_x, inner_y);
-            display.set(offset_x + inner_x, offset_y + inner_y, is_set);
+            let x = offset_x + inner_x;
+            let y = offset_y + inner_y;
+
+            if x >= display.width() || y >= display.height() {
+                error!("stopping pixel grid draw because coordinate {x} {y} is out of bounds");
+                return false;
+            }
+
+            display.set(x, y, is_set);
         }
     }
+
+    true
 }
 
 fn get_coordinates_for_index(offset: usize, index: usize) -> (usize, usize) {
