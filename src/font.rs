@@ -1,18 +1,20 @@
+use std::sync::Arc;
+
 use font_kit::canvas::{Canvas, Format, RasterizationOptions};
+use font_kit::font::Font;
 use font_kit::hinting::HintingOptions;
 use pathfinder_geometry::transform2d::Transform2F;
 use pathfinder_geometry::vector::{vec2f, vec2i};
 use servicepoint2::{PixelGrid, TILE_SIZE};
+
+const DEFAULT_FONT_FILE: &[u8] = include_bytes!("../Web437_IBM_BIOS.woff");
 
 pub struct BitmapFont {
     bitmaps: [PixelGrid; u8::MAX as usize],
 }
 
 impl BitmapFont {
-    pub fn load_file(file: &str) -> BitmapFont {
-        let font = font_kit::font::Font::from_path(file, 0)
-            .expect("could not load font");
-
+    pub fn load(font: Font) -> BitmapFont {
         let mut bitmaps = core::array::from_fn(|_| {
             PixelGrid::new(TILE_SIZE as usize, TILE_SIZE as usize)
         });
@@ -55,5 +57,13 @@ impl BitmapFont {
 
     pub fn get_bitmap(&self, char_code: u8) -> &PixelGrid {
         &self.bitmaps[char_code as usize]
+    }
+}
+
+impl Default for BitmapFont {
+    fn default() -> Self {
+        let font = Font::from_bytes(Arc::new(DEFAULT_FONT_FILE.to_vec()), 0)
+            .expect("could not load included font");
+        Self::load(font)
     }
 }

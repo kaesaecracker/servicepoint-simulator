@@ -6,7 +6,7 @@ use std::sync::{mpsc, RwLock};
 use std::time::Duration;
 
 use clap::Parser;
-use log::{info, warn};
+use log::{info, LevelFilter, warn};
 use servicepoint2::{
     ByteGrid, Command, PIXEL_HEIGHT, PIXEL_WIDTH, PixelGrid, TILE_HEIGHT,
     TILE_WIDTH,
@@ -36,7 +36,10 @@ struct Cli {
 }
 
 fn main() {
-    env_logger::init();
+    env_logger::builder()
+        .filter_level(LevelFilter::Info)
+        .parse_default_env()
+        .init();
 
     let mut cli = Cli::parse();
     if !(cli.red || cli.blue || cli.green) {
@@ -49,8 +52,6 @@ fn main() {
         .set_nonblocking(true)
         .expect("could not enter non blocking mode");
 
-    let font = BitmapFont::load_file("Web437_IBM_BIOS.woff");
-
     let display = RwLock::new(PixelGrid::new(
         PIXEL_WIDTH as usize,
         PIXEL_HEIGHT as usize,
@@ -60,7 +61,7 @@ fn main() {
     luma.fill(u8::MAX);
     let luma = RwLock::new(luma);
 
-    run(&display, &luma, socket, font, &cli);
+    run(&display, &luma, socket, BitmapFont::default(), &cli);
 }
 
 fn run(
