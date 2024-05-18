@@ -2,10 +2,10 @@ use std::sync::mpsc::Sender;
 use std::sync::RwLock;
 
 use log::{info, warn};
-use pixels::wgpu::TextureFormat;
 use pixels::{Pixels, PixelsBuilder, SurfaceTexture};
+use pixels::wgpu::TextureFormat;
 use servicepoint2::{
-    ByteGrid, PixelGrid, PIXEL_HEIGHT, PIXEL_WIDTH, TILE_SIZE,
+    ByteGrid, PIXEL_HEIGHT, PIXEL_WIDTH, PixelGrid, TILE_SIZE,
 };
 use winit::application::ApplicationHandler;
 use winit::dpi::{LogicalSize, Size};
@@ -47,6 +47,44 @@ impl<'t> App<'t> {
             window: None,
             cli,
         }
+    }
+
+    fn draw(&mut self) {
+        let pixels = self.pixels.as_mut().unwrap();
+
+        let mut frame = pixels.frame_mut().chunks_exact_mut(4);
+        let display = self.display.read().unwrap();
+        let luma = self.luma.read().unwrap();
+        for y in 0..PIXEL_HEIGHT as usize {
+            if self.cli.spacers && y != 0 && y % TILE_SIZE as usize == 0 {
+                // cannot just frame.skip(PIXEL_WIDTH as usize * SPACER_HEIGHT as usize) because of typing
+                for _ in 0..PIXEL_WIDTH as usize * SPACER_HEIGHT as usize {
+                    frame.next().unwrap();
+                }
+            }
+
+            for x in 0..PIXEL_WIDTH as usize {
+                let is_set = display.get(x, y);
+                let brightness =
+                    luma.get(x / TILE_SIZE as usize, y / TILE_SIZE as usize);
+
+                let color = if is_set {
+                    [
+                        if self.cli.red { brightness } else { 0u8 },
+                        if self.cli.green { brightness } else { 0u8 },
+                        if self.cli.blue { brightness } else { 0u8 },
+                        255,
+                    ]
+                } else {
+                    [0u8, 0, 0, 255]
+                };
+
+                let pixel = frame.next().unwrap();
+                pixel.copy_from_slice(&color);
+            }
+        }
+
+        pixels.render().expect("could not render");
     }
 }
 
@@ -105,53 +143,17 @@ impl ApplicationHandler<AppEvents> for App<'_> {
         _: WindowId,
         event: WindowEvent,
     ) {
-        if event == WindowEvent::CloseRequested {
-            warn!("window event cloe requested");
-            self.window = None;
-            let _ = self.stop_udp_tx.send(()); // try to stop udp thread
-            event_loop.exit();
-        }
-
-        if event != WindowEvent::RedrawRequested {
-            return;
-        }
-
-        let pixels = self.pixels.as_mut().unwrap();
-
-        let mut frame = pixels.frame_mut().chunks_exact_mut(4);
-
-        let display = self.display.read().unwrap();
-        let luma = self.luma.read().unwrap();
-
-        for y in 0..PIXEL_HEIGHT as usize {
-            if self.cli.spacers && y != 0 && y % TILE_SIZE as usize == 0 {
-                // cannot just frame.skip(PIXEL_WIDTH as usize * SPACER_HEIGHT as usize) because of typing
-                for _ in 0..PIXEL_WIDTH as usize * SPACER_HEIGHT as usize {
-                    frame.next().unwrap();
-                }
+        match event {
+            WindowEvent::CloseRequested => {
+                warn!("window event cloe requested");
+                self.window = None;
+                let _ = self.stop_udp_tx.send(()); // try to stop udp thread
+                event_loop.exit();
             }
-
-            for x in 0..PIXEL_WIDTH as usize {
-                let is_set = display.get(x, y);
-                let brightness =
-                    luma.get(x / TILE_SIZE as usize, y / TILE_SIZE as usize);
-
-                let color = if is_set {
-                    [
-                        if self.cli.red { brightness } else { 0u8 },
-                        if self.cli.green { brightness } else { 0u8 },
-                        if self.cli.blue { brightness } else { 0u8 },
-                        255,
-                    ]
-                } else {
-                    [0u8, 0, 0, 255]
-                };
-
-                let pixel = frame.next().unwrap();
-                pixel.copy_from_slice(&color);
+            WindowEvent::RedrawRequested => {
+                self.draw();
             }
+            _ => {}
         }
-
-        pixels.render().expect("could not render");
     }
 }
