@@ -2,15 +2,16 @@ use std::sync::mpsc::Sender;
 use std::sync::RwLock;
 
 use log::{info, warn};
-use pixels::{Pixels, PixelsBuilder, SurfaceTexture};
 use pixels::wgpu::TextureFormat;
+use pixels::{Pixels, PixelsBuilder, SurfaceTexture};
 use servicepoint2::{
-    ByteGrid, PIXEL_HEIGHT, PIXEL_WIDTH, PixelGrid, TILE_SIZE,
+    ByteGrid, PixelGrid, PIXEL_HEIGHT, PIXEL_WIDTH, TILE_SIZE,
 };
 use winit::application::ApplicationHandler;
-use winit::dpi::{LogicalSize, Size};
+use winit::dpi::LogicalSize;
 use winit::event::WindowEvent;
 use winit::event_loop::ActiveEventLoop;
+use winit::keyboard::KeyCode::KeyC;
 use winit::window::{Window, WindowId};
 
 use crate::Cli;
@@ -95,32 +96,29 @@ impl ApplicationHandler<AppEvents> for App<'_> {
             PIXEL_HEIGHT + num_spacers * SPACER_HEIGHT
         } else {
             PIXEL_HEIGHT
-        } as f64;
+        };
 
-        let size = Size::from(LogicalSize::new(PIXEL_WIDTH as f64, height));
+        let size = LogicalSize::new(PIXEL_WIDTH, height);
         let attributes = Window::default_attributes()
             .with_title("servicepoint-simulator")
-            .with_inner_size(size);
+            .with_inner_size(size)
+            .with_transparent(false);
 
         let window = event_loop.create_window(attributes).unwrap();
         self.window = Some(window);
         let window = self.window.as_ref().unwrap();
 
-        self.pixels = Some({
-            let window_size = window.inner_size();
-            PixelsBuilder::new(
-                window_size.width,
-                window_size.height,
-                SurfaceTexture::new(
-                    window_size.width,
-                    window_size.height,
-                    &window,
-                ),
-            )
-            .render_texture_format(TextureFormat::Bgra8UnormSrgb)
-            .build()
-            .expect("could not create pixels")
-        });
+        let window_size = window.inner_size();
+        let pixels = PixelsBuilder::new(
+            size.width as u32,
+            size.height as u32,
+            SurfaceTexture::new(window_size.width, window_size.height, &window),
+        )
+        .render_texture_format(TextureFormat::Bgra8UnormSrgb)
+        .build()
+        .expect("could not create pixels");
+
+        self.pixels = Some(pixels);
     }
 
     fn user_event(&mut self, event_loop: &ActiveEventLoop, event: AppEvents) {
@@ -145,13 +143,20 @@ impl ApplicationHandler<AppEvents> for App<'_> {
     ) {
         match event {
             WindowEvent::CloseRequested => {
-                warn!("window event cloe requested");
+                warn!("window event close requested");
                 self.window = None;
                 let _ = self.stop_udp_tx.send(()); // try to stop udp thread
                 event_loop.exit();
             }
             WindowEvent::RedrawRequested => {
                 self.draw();
+            }
+            WindowEvent::KeyboardInput { event, .. }
+                if event.physical_key == KeyC && !event.repeat =>
+            {
+                self.display.write().unwrap().fill(false);
+                self.luma.write().unwrap().fill(u8::MAX);
+                self.window.as_ref().unwrap().request_redraw();
             }
             _ => {}
         }
