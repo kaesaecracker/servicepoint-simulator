@@ -5,7 +5,7 @@ use font_kit::font::Font;
 use font_kit::hinting::HintingOptions;
 use pathfinder_geometry::transform2d::Transform2F;
 use pathfinder_geometry::vector::{vec2f, vec2i};
-use servicepoint2::{Grid, PixelGrid, TILE_SIZE};
+use servicepoint::{Grid, PixelGrid, TILE_SIZE};
 
 const DEFAULT_FONT_FILE: &[u8] = include_bytes!("../Web437_IBM_BIOS.woff");
 

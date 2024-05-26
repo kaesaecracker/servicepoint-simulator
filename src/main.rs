@@ -7,7 +7,7 @@ use std::time::Duration;
 
 use clap::Parser;
 use log::{info, warn, LevelFilter};
-use servicepoint2::{ByteGrid, Command, PixelGrid, PIXEL_HEIGHT, PIXEL_WIDTH, TILE_HEIGHT, TILE_WIDTH, Grid};
+use servicepoint::{ByteGrid, Command, PixelGrid, PIXEL_HEIGHT, PIXEL_WIDTH, TILE_HEIGHT, TILE_WIDTH, Grid};
 use winit::event_loop::{ControlFlow, EventLoop};
 
 use crate::execute_command::execute_command;
@@ -100,7 +100,7 @@ fn run(
                     );
                 }
 
-                let package = match servicepoint2::Packet::try_from(&buf[..amount]) {
+                let package = match servicepoint::Packet::try_from(&buf[..amount]) {
                     Err(_) =>  {
                         warn!("could not load packet with length {amount} into header");
                         continue;

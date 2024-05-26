@@ -4,7 +4,7 @@ use std::sync::RwLock;
 use log::{info, warn};
 use pixels::wgpu::TextureFormat;
 use pixels::{Pixels, PixelsBuilder, SurfaceTexture};
-use servicepoint2::{ByteGrid, PixelGrid, PIXEL_HEIGHT, PIXEL_WIDTH, TILE_SIZE, Grid};
+use servicepoint::{ByteGrid, PixelGrid, PIXEL_HEIGHT, PIXEL_WIDTH, TILE_SIZE, Grid};
 use winit::application::ApplicationHandler;
 use winit::dpi::LogicalSize;
 use winit::event::WindowEvent;

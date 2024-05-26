@@ -1,7 +1,7 @@
 use std::sync::{RwLock, RwLockWriteGuard};
 
 use log::{debug, error, info, warn};
-use servicepoint2::{
+use servicepoint::{
     ByteGrid, Command, Grid, Origin, PIXEL_COUNT, PIXEL_WIDTH, PixelGrid,
     TILE_SIZE,
 };
@@ -44,7 +44,7 @@ pub(crate) fn execute_command(
             let mut display = display_ref.write().unwrap();
             for bitmap_index in 0..vec.len() {
                 let (x, y) =
-                    get_coordinates_for_index(offset as usize, bitmap_index);
+                    get_coordinates_for_index(offset, bitmap_index);
                 display.set(x, y, vec.get(bitmap_index));
             }
         }
@@ -55,7 +55,7 @@ pub(crate) fn execute_command(
             let mut display = display_ref.write().unwrap();
             for bitmap_index in 0..vec.len() {
                 let (x, y) =
-                    get_coordinates_for_index(offset as usize, bitmap_index);
+                    get_coordinates_for_index(offset, bitmap_index);
                 let old_value = display.get(x, y);
                 display.set(x, y, old_value && vec.get(bitmap_index));
             }
@@ -67,7 +67,7 @@ pub(crate) fn execute_command(
             let mut display = display_ref.write().unwrap();
             for bitmap_index in 0..vec.len() {
                 let (x, y) =
-                    get_coordinates_for_index(offset as usize, bitmap_index);
+                    get_coordinates_for_index(offset, bitmap_index);
                 let old_value = display.get(x, y);
                 display.set(x, y, old_value || vec.get(bitmap_index));
             }
@@ -79,7 +79,7 @@ pub(crate) fn execute_command(
             let mut display = display_ref.write().unwrap();
             for bitmap_index in 0..vec.len() {
                 let (x, y) =
-                    get_coordinates_for_index(offset as usize, bitmap_index);
+                    get_coordinates_for_index(offset, bitmap_index);
                 let old_value = display.get(x, y);
                 display.set(x, y, old_value ^ vec.get(bitmap_index));
             }

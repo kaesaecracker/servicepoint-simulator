@@ -1338,7 +1338,7 @@ dependencies = [
  "log",
  "pathfinder_geometry",
  "pixels",
- "servicepoint2",
+ "servicepoint",
  "winit",
 ]
 
@@ -1621,10 +1621,10 @@ dependencies = [
 ]
 
 [[package]]
-name = "servicepoint2"
-version = "0.4.2"
+name = "servicepoint"
+version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "94d9aecc4d31a71578481de6c6d64383d374126c38469c9689067579c1d910fd"
+checksum = "85be013633ecfdf39be44b39f2417d3d8a58d3ca387cdfc03372c5840748f227"
 dependencies = [
  "bzip2",
  "flate2",
