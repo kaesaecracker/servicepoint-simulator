@@ -2,7 +2,8 @@ use std::sync::{RwLock, RwLockWriteGuard};
 
 use log::{debug, error, info, warn};
 use servicepoint2::{
-    ByteGrid, Command, Origin, PixelGrid, PIXEL_COUNT, PIXEL_WIDTH, TILE_SIZE,
+    ByteGrid, Command, Grid, Origin, PIXEL_COUNT, PIXEL_WIDTH, PixelGrid,
+    TILE_SIZE,
 };
 
 use crate::font::BitmapFont;
@@ -25,7 +26,7 @@ pub(crate) fn execute_command(
         }
         Command::BitmapLinearWin(Origin(x, y), pixels, _) => {
             let mut display = display_ref.write().unwrap();
-            print_pixel_grid(x as usize, y as usize, &pixels, &mut display);
+            print_pixel_grid(x, y, &pixels, &mut display);
         }
         Command::Cp437Data(origin, grid) => {
             let mut display = display_ref.write().unwrap();
@@ -37,7 +38,7 @@ pub(crate) fn execute_command(
         }
         // TODO: how to deduplicate this code in a rusty way?
         Command::BitmapLinear(offset, vec, _) => {
-            if !check_bitmap_valid(offset, vec.len()) {
+            if !check_bitmap_valid(offset as u16, vec.len()) {
                 return true;
             }
             let mut display = display_ref.write().unwrap();
@@ -48,7 +49,7 @@ pub(crate) fn execute_command(
             }
         }
         Command::BitmapLinearAnd(offset, vec, _) => {
-            if !check_bitmap_valid(offset, vec.len()) {
+            if !check_bitmap_valid(offset as u16, vec.len()) {
                 return true;
             }
             let mut display = display_ref.write().unwrap();
@@ -60,7 +61,7 @@ pub(crate) fn execute_command(
             }
         }
         Command::BitmapLinearOr(offset, vec, _) => {
-            if !check_bitmap_valid(offset, vec.len()) {
+            if !check_bitmap_valid(offset as u16, vec.len()) {
                 return true;
             }
             let mut display = display_ref.write().unwrap();
@@ -72,7 +73,7 @@ pub(crate) fn execute_command(
             }
         }
         Command::BitmapLinearXor(offset, vec, _) => {
-            if !check_bitmap_valid(offset, vec.len()) {
+            if !check_bitmap_valid(offset as u16, vec.len()) {
                 return true;
             }
             let mut display = display_ref.write().unwrap();
@@ -85,8 +86,6 @@ pub(crate) fn execute_command(
         }
         Command::CharBrightness(origin, grid) => {
             let Origin(offset_x, offset_y) = origin;
-            let offset_x = offset_x as usize;
-            let offset_y = offset_y as usize;
 
             let mut luma = luma_ref.write().unwrap();
             for inner_y in 0..grid.height() {
@@ -130,9 +129,6 @@ fn print_cp437_data(
     display: &mut RwLockWriteGuard<PixelGrid>,
 ) {
     let Origin(x, y) = origin;
-    let x = x as usize;
-    let y = y as usize;
-
     for char_y in 0usize..grid.height() {
         for char_x in 0usize..grid.width() {
             let char_code = grid.get(char_x, char_y);
@@ -142,8 +138,8 @@ fn print_cp437_data(
 
             let bitmap = font.get_bitmap(char_code);
             if !print_pixel_grid(
-                tile_x * TILE_SIZE as usize,
-                tile_y * TILE_SIZE as usize,
+                tile_x * TILE_SIZE,
+                tile_y * TILE_SIZE,
                 bitmap,
                 display,
             ) {
@@ -185,8 +181,5 @@ fn print_pixel_grid(
 
 fn get_coordinates_for_index(offset: usize, index: usize) -> (usize, usize) {
     let pixel_index = offset + index;
-    (
-        pixel_index % PIXEL_WIDTH as usize,
-        pixel_index / PIXEL_WIDTH as usize,
-    )
+    (pixel_index % PIXEL_WIDTH, pixel_index / PIXEL_WIDTH)
 }

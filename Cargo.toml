@@ -7,7 +7,7 @@ license = "GPL-3.0-or-later"
 
 [dependencies]
 # packet parsing
-servicepoint2 = "0.4.1"
+servicepoint2 = { version = "0.4.2", features = ["all_compressions"] }
 
 # gui
 winit = { version = "0.30", features = ["rwh_05"] } # for creating a window

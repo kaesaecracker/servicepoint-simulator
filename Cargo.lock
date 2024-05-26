@@ -477,9 +477,9 @@ dependencies = [
 
 [[package]]
 name = "crc32fast"
-version = "1.4.0"
+version = "1.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b3855a8a784b474f333699ef2bbca9db2c4a1f6d9088a90a2d25b1eb53111eaa"
+checksum = "a97769d94ddab943e4510d138150169a2758b5ef3eb191a9ee688de3e23ef7b3"
 dependencies = [
  "cfg-if",
 ]
@@ -1622,9 +1622,9 @@ dependencies = [
 
 [[package]]
 name = "servicepoint2"
-version = "0.4.1"
+version = "0.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "54d49d501f34100406d70730d887775ed5961b6343ccb10d5ef0e105d7b295ae"
+checksum = "94d9aecc4d31a71578481de6c6d64383d374126c38469c9689067579c1d910fd"
 dependencies = [
  "bzip2",
  "flate2",
