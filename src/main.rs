@@ -7,10 +7,7 @@ use std::time::Duration;
 
 use clap::Parser;
 use log::{info, warn, LevelFilter};
-use servicepoint2::{
-    ByteGrid, Command, PixelGrid, PIXEL_HEIGHT, PIXEL_WIDTH, TILE_HEIGHT,
-    TILE_WIDTH,
-};
+use servicepoint2::{ByteGrid, Command, PixelGrid, PIXEL_HEIGHT, PIXEL_WIDTH, TILE_HEIGHT, TILE_WIDTH, Grid};
 use winit::event_loop::{ControlFlow, EventLoop};
 
 use crate::execute_command::execute_command;
@@ -53,11 +50,11 @@ fn main() {
         .expect("could not enter non blocking mode");
 
     let display = RwLock::new(PixelGrid::new(
-        PIXEL_WIDTH as usize,
-        PIXEL_HEIGHT as usize,
+        PIXEL_WIDTH,
+        PIXEL_HEIGHT,
     ));
 
-    let mut luma = ByteGrid::new(TILE_WIDTH as usize, TILE_HEIGHT as usize);
+    let mut luma = ByteGrid::new(TILE_WIDTH, TILE_HEIGHT);
     luma.fill(u8::MAX);
     let luma = RwLock::new(luma);
 

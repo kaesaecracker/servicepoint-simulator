@@ -4,9 +4,7 @@ use std::sync::RwLock;
 use log::{info, warn};
 use pixels::wgpu::TextureFormat;
 use pixels::{Pixels, PixelsBuilder, SurfaceTexture};
-use servicepoint2::{
-    ByteGrid, PixelGrid, PIXEL_HEIGHT, PIXEL_WIDTH, TILE_SIZE,
-};
+use servicepoint2::{ByteGrid, PixelGrid, PIXEL_HEIGHT, PIXEL_WIDTH, TILE_SIZE, Grid};
 use winit::application::ApplicationHandler;
 use winit::dpi::LogicalSize;
 use winit::event::WindowEvent;
@@ -25,7 +23,7 @@ pub struct App<'t> {
     cli: &'t Cli,
 }
 
-const SPACER_HEIGHT: u16 = 4;
+const SPACER_HEIGHT: usize = 4;
 
 #[derive(Debug)]
 pub enum AppEvents {
@@ -56,18 +54,18 @@ impl<'t> App<'t> {
         let mut frame = pixels.frame_mut().chunks_exact_mut(4);
         let display = self.display.read().unwrap();
         let luma = self.luma.read().unwrap();
-        for y in 0..PIXEL_HEIGHT as usize {
-            if self.cli.spacers && y != 0 && y % TILE_SIZE as usize == 0 {
+        for y in 0..PIXEL_HEIGHT {
+            if self.cli.spacers && y != 0 && y % TILE_SIZE == 0 {
                 // cannot just frame.skip(PIXEL_WIDTH as usize * SPACER_HEIGHT as usize) because of typing
-                for _ in 0..PIXEL_WIDTH as usize * SPACER_HEIGHT as usize {
+                for _ in 0..PIXEL_WIDTH * SPACER_HEIGHT {
                     frame.next().unwrap();
                 }
             }
 
-            for x in 0..PIXEL_WIDTH as usize {
+            for x in 0..PIXEL_WIDTH {
                 let is_set = display.get(x, y);
                 let brightness =
-                    luma.get(x / TILE_SIZE as usize, y / TILE_SIZE as usize);
+                    luma.get(x / TILE_SIZE, y / TILE_SIZE);
 
                 let color = if is_set {
                     [
@@ -98,7 +96,7 @@ impl ApplicationHandler<AppEvents> for App<'_> {
             PIXEL_HEIGHT
         };
 
-        let size = LogicalSize::new(PIXEL_WIDTH, height);
+        let size = LogicalSize::new(PIXEL_WIDTH as u16, height as u16);
         let attributes = Window::default_attributes()
             .with_title("servicepoint-simulator")
             .with_inner_size(size)

@@ -5,7 +5,7 @@ use font_kit::font::Font;
 use font_kit::hinting::HintingOptions;
 use pathfinder_geometry::transform2d::Transform2F;
 use pathfinder_geometry::vector::{vec2f, vec2i};
-use servicepoint2::{PixelGrid, TILE_SIZE};
+use servicepoint2::{Grid, PixelGrid, TILE_SIZE};
 
 const DEFAULT_FONT_FILE: &[u8] = include_bytes!("../Web437_IBM_BIOS.woff");
 
@@ -16,7 +16,7 @@ pub struct BitmapFont {
 impl BitmapFont {
     pub fn load(font: Font) -> BitmapFont {
         let mut bitmaps = core::array::from_fn(|_| {
-            PixelGrid::new(TILE_SIZE as usize, TILE_SIZE as usize)
+            PixelGrid::new(TILE_SIZE, TILE_SIZE)
         });
 
         for char_code in u8::MIN..u8::MAX {
@@ -43,9 +43,9 @@ impl BitmapFont {
             assert_eq!(canvas.pixels.len(), 64);
             assert_eq!(canvas.stride, 8);
 
-            for y in 0..TILE_SIZE as usize {
-                for x in 0..TILE_SIZE as usize {
-                    let index = x + y * TILE_SIZE as usize;
+            for y in 0..TILE_SIZE {
+                for x in 0..TILE_SIZE {
+                    let index = x + y * TILE_SIZE;
                     let canvas_val = canvas.pixels[index] != 0;
                     bitmaps[char_code as usize].set(x, y, canvas_val);
                 }
