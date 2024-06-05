@@ -45,7 +45,7 @@ pub(crate) fn execute_command(
             for bitmap_index in 0..vec.len() {
                 let (x, y) =
                     get_coordinates_for_index(offset, bitmap_index);
-                display.set(x, y, vec.get(bitmap_index));
+                display.set(x, y, vec[bitmap_index]);
             }
         }
         Command::BitmapLinearAnd(offset, vec, _) => {
@@ -57,7 +57,7 @@ pub(crate) fn execute_command(
                 let (x, y) =
                     get_coordinates_for_index(offset, bitmap_index);
                 let old_value = display.get(x, y);
-                display.set(x, y, old_value && vec.get(bitmap_index));
+                display.set(x, y, old_value && vec[bitmap_index]);
             }
         }
         Command::BitmapLinearOr(offset, vec, _) => {
@@ -69,7 +69,7 @@ pub(crate) fn execute_command(
                 let (x, y) =
                     get_coordinates_for_index(offset, bitmap_index);
                 let old_value = display.get(x, y);
-                display.set(x, y, old_value || vec.get(bitmap_index));
+                display.set(x, y, old_value || vec[bitmap_index]);
             }
         }
         Command::BitmapLinearXor(offset, vec, _) => {
@@ -81,7 +81,7 @@ pub(crate) fn execute_command(
                 let (x, y) =
                     get_coordinates_for_index(offset, bitmap_index);
                 let old_value = display.get(x, y);
-                display.set(x, y, old_value ^ vec.get(bitmap_index));
+                display.set(x, y, old_value ^ vec[bitmap_index]);
             }
         }
         Command::CharBrightness(origin, grid) => {
