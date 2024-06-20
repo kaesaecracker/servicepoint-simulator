@@ -12,7 +12,7 @@ Use cases:
 - test your project when outside CCCB
 - test your project while other people are using the display
 
-Uses the [servicepoint](https://github.com/cccb/servicepoint) library for reading the packets. Currently only works with my [fork](https://github.com/kaesaecracker/servicepoint).
+Uses the [servicepoint](https://github.com/cccb/servicepoint) library for reading the packets.
 The screenshot above shows the output of two example projects running in parallel (game_of_life and random_brightness).
 
 ## Running
