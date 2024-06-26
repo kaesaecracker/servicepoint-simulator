@@ -7,7 +7,10 @@ use std::time::Duration;
 
 use clap::Parser;
 use log::{info, warn, LevelFilter};
-use servicepoint::{ByteGrid, Command, PixelGrid, PIXEL_HEIGHT, PIXEL_WIDTH, TILE_HEIGHT, TILE_WIDTH, Grid};
+use servicepoint::{
+    Brightness, BrightnessGrid, Command, Grid, PixelGrid, PIXEL_HEIGHT,
+    PIXEL_WIDTH, TILE_HEIGHT, TILE_WIDTH,
+};
 use winit::event_loop::{ControlFlow, EventLoop};
 
 use crate::execute_command::execute_command;
@@ -49,13 +52,10 @@ fn main() {
         .set_nonblocking(true)
         .expect("could not enter non blocking mode");
 
-    let display = RwLock::new(PixelGrid::new(
-        PIXEL_WIDTH,
-        PIXEL_HEIGHT,
-    ));
+    let display = RwLock::new(PixelGrid::new(PIXEL_WIDTH, PIXEL_HEIGHT));
 
-    let mut luma = ByteGrid::new(TILE_WIDTH, TILE_HEIGHT);
-    luma.fill(u8::MAX);
+    let mut luma = BrightnessGrid::new(TILE_WIDTH, TILE_HEIGHT);
+    luma.fill(Brightness::MAX);
     let luma = RwLock::new(luma);
 
     run(&display, &luma, socket, BitmapFont::default(), &cli);
@@ -63,7 +63,7 @@ fn main() {
 
 fn run(
     display_ref: &RwLock<PixelGrid>,
-    luma_ref: &RwLock<ByteGrid>,
+    luma_ref: &RwLock<BrightnessGrid>,
     socket: UdpSocket,
     font: BitmapFont,
     cli: &Cli,

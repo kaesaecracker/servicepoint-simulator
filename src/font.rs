@@ -15,9 +15,8 @@ pub struct BitmapFont {
 
 impl BitmapFont {
     pub fn load(font: Font) -> BitmapFont {
-        let mut bitmaps = core::array::from_fn(|_| {
-            PixelGrid::new(TILE_SIZE, TILE_SIZE)
-        });
+        let mut bitmaps =
+            core::array::from_fn(|_| PixelGrid::new(TILE_SIZE, TILE_SIZE));
 
         for char_code in u8::MIN..u8::MAX {
             let char = char_code as char;

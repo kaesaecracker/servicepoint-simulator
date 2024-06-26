@@ -2,8 +2,8 @@ use std::sync::{RwLock, RwLockWriteGuard};
 
 use log::{debug, error, info, warn};
 use servicepoint::{
-    ByteGrid, Command, Grid, Origin, PIXEL_COUNT, PIXEL_WIDTH, PixelGrid,
-    TILE_SIZE,
+    BrightnessGrid, Command, Cp437Grid, Grid, Origin, PixelGrid, Tiles,
+    PIXEL_COUNT, PIXEL_WIDTH, TILE_SIZE,
 };
 
 use crate::font::BitmapFont;
@@ -12,7 +12,7 @@ pub(crate) fn execute_command(
     command: Command,
     font: &BitmapFont,
     display_ref: &RwLock<PixelGrid>,
-    luma_ref: &RwLock<ByteGrid>,
+    luma_ref: &RwLock<BrightnessGrid>,
 ) -> bool {
     debug!("received {command:?}");
     match command {
@@ -24,7 +24,7 @@ pub(crate) fn execute_command(
             warn!("display shutting down");
             return false;
         }
-        Command::BitmapLinearWin(Origin(x, y), pixels, _) => {
+        Command::BitmapLinearWin(Origin { x, y, .. }, pixels, _) => {
             let mut display = display_ref.write().unwrap();
             print_pixel_grid(x, y, &pixels, &mut display);
         }
@@ -43,8 +43,7 @@ pub(crate) fn execute_command(
             }
             let mut display = display_ref.write().unwrap();
             for bitmap_index in 0..vec.len() {
-                let (x, y) =
-                    get_coordinates_for_index(offset, bitmap_index);
+                let (x, y) = get_coordinates_for_index(offset, bitmap_index);
                 display.set(x, y, vec[bitmap_index]);
             }
         }
@@ -54,8 +53,7 @@ pub(crate) fn execute_command(
             }
             let mut display = display_ref.write().unwrap();
             for bitmap_index in 0..vec.len() {
-                let (x, y) =
-                    get_coordinates_for_index(offset, bitmap_index);
+                let (x, y) = get_coordinates_for_index(offset, bitmap_index);
                 let old_value = display.get(x, y);
                 display.set(x, y, old_value && vec[bitmap_index]);
             }
@@ -66,8 +64,7 @@ pub(crate) fn execute_command(
             }
             let mut display = display_ref.write().unwrap();
             for bitmap_index in 0..vec.len() {
-                let (x, y) =
-                    get_coordinates_for_index(offset, bitmap_index);
+                let (x, y) = get_coordinates_for_index(offset, bitmap_index);
                 let old_value = display.get(x, y);
                 display.set(x, y, old_value || vec[bitmap_index]);
             }
@@ -78,22 +75,19 @@ pub(crate) fn execute_command(
             }
             let mut display = display_ref.write().unwrap();
             for bitmap_index in 0..vec.len() {
-                let (x, y) =
-                    get_coordinates_for_index(offset, bitmap_index);
+                let (x, y) = get_coordinates_for_index(offset, bitmap_index);
                 let old_value = display.get(x, y);
                 display.set(x, y, old_value ^ vec[bitmap_index]);
             }
         }
         Command::CharBrightness(origin, grid) => {
-            let Origin(offset_x, offset_y) = origin;
-
             let mut luma = luma_ref.write().unwrap();
             for inner_y in 0..grid.height() {
                 for inner_x in 0..grid.width() {
                     let brightness = grid.get(inner_x, inner_y);
                     luma.set(
-                        offset_x + inner_x,
-                        offset_y + inner_y,
+                        origin.x + inner_x,
+                        origin.y + inner_y,
                         brightness,
                     );
                 }
@@ -123,12 +117,12 @@ fn check_bitmap_valid(offset: u16, payload_len: usize) -> bool {
 }
 
 fn print_cp437_data(
-    origin: Origin,
-    grid: &ByteGrid,
+    origin: Origin<Tiles>,
+    grid: &Cp437Grid,
     font: &BitmapFont,
     display: &mut RwLockWriteGuard<PixelGrid>,
 ) {
-    let Origin(x, y) = origin;
+    let Origin { x, y, .. } = origin;
     for char_y in 0usize..grid.height() {
         for char_x in 0usize..grid.width() {
             let char_code = grid.get(char_x, char_y);

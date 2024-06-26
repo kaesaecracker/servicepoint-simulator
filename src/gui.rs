@@ -4,7 +4,10 @@ use std::sync::RwLock;
 use log::{info, warn};
 use pixels::wgpu::TextureFormat;
 use pixels::{Pixels, PixelsBuilder, SurfaceTexture};
-use servicepoint::{ByteGrid, PixelGrid, PIXEL_HEIGHT, PIXEL_WIDTH, TILE_SIZE, Grid};
+use servicepoint::{
+    Brightness, BrightnessGrid, Grid, PixelGrid, PIXEL_HEIGHT, PIXEL_WIDTH,
+    TILE_SIZE,
+};
 use winit::application::ApplicationHandler;
 use winit::dpi::LogicalSize;
 use winit::event::WindowEvent;
@@ -16,7 +19,7 @@ use crate::Cli;
 
 pub struct App<'t> {
     display: &'t RwLock<PixelGrid>,
-    luma: &'t RwLock<ByteGrid>,
+    luma: &'t RwLock<BrightnessGrid>,
     window: Option<Window>,
     pixels: Option<Pixels>,
     stop_udp_tx: Sender<()>,
@@ -34,7 +37,7 @@ pub enum AppEvents {
 impl<'t> App<'t> {
     pub fn new(
         display: &'t RwLock<PixelGrid>,
-        luma: &'t RwLock<ByteGrid>,
+        luma: &'t RwLock<BrightnessGrid>,
         stop_udp_tx: Sender<()>,
         cli: &'t Cli,
     ) -> Self {
@@ -64,14 +67,21 @@ impl<'t> App<'t> {
 
             for x in 0..PIXEL_WIDTH {
                 let is_set = display.get(x, y);
-                let brightness =
-                    luma.get(x / TILE_SIZE, y / TILE_SIZE);
+                let brightness = luma.get(x / TILE_SIZE, y / TILE_SIZE);
 
                 let color = if is_set {
                     [
-                        if self.cli.red { brightness } else { 0u8 },
-                        if self.cli.green { brightness } else { 0u8 },
-                        if self.cli.blue { brightness } else { 0u8 },
+                        if self.cli.red { brightness.into() } else { 0u8 },
+                        if self.cli.green {
+                            brightness.into()
+                        } else {
+                            0u8
+                        },
+                        if self.cli.blue {
+                            brightness.into()
+                        } else {
+                            0u8
+                        },
                         255,
                     ]
                 } else {
@@ -153,7 +163,7 @@ impl ApplicationHandler<AppEvents> for App<'_> {
                 if event.physical_key == KeyC && !event.repeat =>
             {
                 self.display.write().unwrap().fill(false);
-                self.luma.write().unwrap().fill(u8::MAX);
+                self.luma.write().unwrap().fill(Brightness::MAX);
                 self.window.as_ref().unwrap().request_redraw();
             }
             _ => {}
