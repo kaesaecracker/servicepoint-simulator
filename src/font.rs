@@ -10,7 +10,7 @@ use servicepoint::{Grid, PixelGrid, TILE_SIZE};
 const DEFAULT_FONT_FILE: &[u8] = include_bytes!("../Web437_IBM_BIOS.woff");
 
 pub struct BitmapFont {
-    bitmaps: [PixelGrid; u8::MAX as usize],
+    bitmaps: [PixelGrid; u8::MAX as usize + 1],
 }
 
 impl BitmapFont {
@@ -18,7 +18,7 @@ impl BitmapFont {
         let mut bitmaps =
             core::array::from_fn(|_| PixelGrid::new(TILE_SIZE, TILE_SIZE));
 
-        for char_code in u8::MIN..u8::MAX {
+        for char_code in u8::MIN..=u8::MAX {
             let char = char_code as char;
             let glyph_id = match font.glyph_for_char(char) {
                 None => continue,
