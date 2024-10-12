@@ -16,7 +16,7 @@ jobs:
 
     steps:
     - uses: actions/checkout@v4
-    - name: Install liblzma
-      run: sudo apt-get install -y liblzma
+    - name: Install liblzma-dev
+      run: sudo apt-get install -y liblzma-dev
     - name: Build
       run: cargo build --verbose
