@@ -1,6 +1,6 @@
 use std::sync::{RwLock, RwLockWriteGuard};
 
-use log::{debug, error, info, warn};
+use log::{debug, error, info, trace, warn};
 use servicepoint::{
     BrightnessGrid, Command, Cp437Grid, Grid, Origin, PixelGrid, Tiles,
     PIXEL_COUNT, PIXEL_WIDTH, TILE_SIZE,
@@ -126,6 +126,11 @@ fn print_cp437_data(
     for char_y in 0usize..grid.height() {
         for char_x in 0usize..grid.width() {
             let char_code = grid.get(char_x, char_y);
+            trace!(
+                "drawing char_code {:#04x} (if this was UTF-8, it would be {})",
+                char_code,
+                char::from(char_code)
+            );
 
             let tile_x = char_x + x;
             let tile_y = char_y + y;

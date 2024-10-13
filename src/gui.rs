@@ -67,10 +67,11 @@ impl<'t> App<'t> {
 
             for x in 0..PIXEL_WIDTH {
                 let is_set = display.get(x, y);
-                let brightness: u8 = luma.get(x / TILE_SIZE, y / TILE_SIZE).into();
+                let brightness: u8 =
+                    luma.get(x / TILE_SIZE, y / TILE_SIZE).into();
                 let max_brightness: u8 = Brightness::MAX.into();
                 let scale: f32 = (u8::MAX as f32) / (max_brightness as f32);
-                
+
                 let brightness = (scale * brightness as f32) as u8;
 
                 let color = if is_set {

@@ -17,6 +17,7 @@ use crate::gui::{App, AppEvents};
 mod execute_command;
 mod font;
 mod gui;
+mod static_font;
 
 #[derive(Parser, Debug)]
 struct Cli {
