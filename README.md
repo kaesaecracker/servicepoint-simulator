@@ -1,4 +1,4 @@
-# pixel-receiver-rs
+# servicepoint-simulator
 
 An emulator for the CCCB airport display. 
 
@@ -21,14 +21,14 @@ Check out this repository and run `cargo run --release`.
 
 ## Command line arguments
 
-The application binds to `0.0.0.0:2342` by default (`./pixel-receiver-rs --bind host:port` to change this).
+The application binds to `0.0.0.0:2342` by default (`./servicepoint-simulator --bind host:port` to change this).
 
 See [env_logger](https://docs.rs/env_logger/latest/env_logger/) to configure logging.
 
 Because this program renders to an RGB pixel buffer, you can enjoy the following additional features not available on the real display:
 
-- enable or disable the empty space between tile rows (`./pixel-receiver-rs --spacers` to enable)
-- render pixels in red, green, blue or a combination of the three (`./pixel-receiver-rs -rgb` for white pixels)
+- enable or disable the empty space between tile rows (`./servicepoint-simulator --spacers` to enable)
+- render pixels in red, green, blue or a combination of the three (`./servicepoint-simulator -rgb` for white pixels)
 
 ## Contributing
 
