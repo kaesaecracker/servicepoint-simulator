@@ -17,7 +17,9 @@ The screenshot above shows the output of two example projects running in paralle
 
 ## Running
 
-Check out this repository and run `cargo run --release`.
+With nix flakes: `nix run github:kaesaecracker/servicepoint-simulator`
+
+Without nix: check out this repository and use `cargo run --release`.
 
 ## Command line arguments
 

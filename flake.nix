@@ -8,37 +8,72 @@
   outputs =
     inputs@{ self, nixpkgs }:
     let
-      servicepoint-simulator = nixpkgs.legacyPackages.x86_64-linux.rustPlatform.buildRustPackage rec {
-        pname = "servicepoint-simulator";
-        version = "0.0.1";
-
-        src = ./.; # TODO: src, Cargo.toml etc
-
-        buildInputs = [
-
-        ];
-        nativeBuildInputs = with nixpkgs.legacyPackages.x86_64-linux; [ pkg-config ];
-        #cargoSha256 = "sha256-0hfmV4mbr3l86m0X7EMYTOu/b+BjueVEbbyQz0KgOFY=";
-        cargoLock.lockFile = ./Cargo.lock;
-
-        meta = with nixpkgs.stdenv.lib; {
-          homepage = "";
-          description = "";
-          #license = licenses.gplv3;
-        };
-
-      };
+      lib = nixpkgs.lib;
+      forAllSystems = lib.genAttrs lib.systems.flakeExposed;
     in
     rec {
-      packages.x86_64-linux.default = servicepoint-simulator;
+      packages = forAllSystems (
+        system:
+        let
+          pkgs = nixpkgs.legacyPackages."${system}";
+        in
+        {
+          default = pkgs.rustPlatform.buildRustPackage {
+            pname = "servicepoint-simulator";
+            version = "0.0.1";
+            cargoLock = {
+              lockFile = ./Cargo.lock;
+              allowBuiltinFetchGit = true;
+            };
+
+            src = ./.;
+
+            nativeBuildInputs = with pkgs; [ pkg-config ];
+
+            buildInputs =
+              with pkgs;
+              [
+                xe
+                lzma
+              ]
+              ++ (lib.optionals pkgs.stdenv.isLinux (
+                with pkgs;
+                [
+                  xorg.libxkbfile
+                  wayland
+                  libxkbcommon
+                ]
+              ));
+
+            meta = with lib; {
+              homepage = "";
+              description = "";
+              license = licenses.gpl3;
+            };
+          };
+        }
+      );
 
       legacyPackages = packages;
 
-      devShells.x86_64-linux.default = import ./shell.nix { pkgs = nixpkgs.legacyPackages.x86_64-linux; };
+      devShells = forAllSystems (
+        system:
+        let
+          pkgs = nixpkgs.legacyPackages."${system}";
+        in
+        {
+          default = pkgs.mkShell {
+            inputsFrom = [ self.packages.${system}.default ];
+            packages = with pkgs; [
+              rustfmt
+              cargo-expand
+            ];
+            #LD_LIBRARY_PATH="${pkgs.lib.makeLibraryPath buildInputs}";
+            RUST_SRC_PATH = "${pkgs.rust.packages.stable.rustPlatform.rustLibSrc}";
+          };
+        }
+      );
 
-      formatter = {
-        x86_64-linux = nixpkgs.legacyPackages.x86_64-linux.nixfmt-rfc-style;
-        aarch64-linux = nixpkgs.legacyPackages.aarch64-linux.nixfmt-rfc-style;
-      };
+      formatter = forAllSystems (system: nixpkgs.legacyPackages."${system}".nixfmt-rfc-style);
     };
 }
