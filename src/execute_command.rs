@@ -106,10 +106,7 @@ pub(crate) fn execute_command(
 
 fn check_bitmap_valid(offset: u16, payload_len: usize) -> bool {
     if offset as usize + payload_len > PIXEL_COUNT {
-        error!(
-            "bitmap with offset {offset} is too big ({} bytes)",
-            payload_len
-        );
+        error!("bitmap with offset {offset} is too big ({payload_len} bytes)");
         return false;
     }
 
@@ -127,8 +124,7 @@ fn print_cp437_data(
         for char_x in 0usize..grid.width() {
             let char_code = grid.get(char_x, char_y);
             trace!(
-                "drawing char_code {:#04x} (if this was UTF-8, it would be {})",
-                char_code,
+                "drawing char_code {char_code:#04x} (if this was UTF-8, it would be {})",
                 char::from(char_code)
             );
 

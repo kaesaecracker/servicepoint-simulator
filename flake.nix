@@ -3,12 +3,9 @@
 
   inputs = {
     nixpkgs.url = "github:nixos/nixpkgs/nixos-24.05";
+    nix-filter.url = "github:numtide/nix-filter";
     naersk = {
       url = "github:nix-community/naersk";
-      inputs.nixpkgs.follows = "nixpkgs";
-    };
-    nix-filter = {
-      url = "github:numtide/nix-filter";
       inputs.nixpkgs.follows = "nixpkgs";
     };
   };
@@ -29,15 +26,26 @@
         "x86_64-darwin"
       ];
       forAllSystems = lib.genAttrs supported-systems;
+      make-rust-toolchain-core =
+        pkgs:
+        pkgs.symlinkJoin {
+          name = "rust-toolchain-core";
+          paths = with pkgs; [
+            rustc
+            cargo
+            rustPlatform.rustcSrc
+          ];
+        };
     in
     rec {
       packages = forAllSystems (
         system:
         let
           pkgs = nixpkgs.legacyPackages."${system}";
+          rust-toolchain-core = make-rust-toolchain-core pkgs;
           naersk' = pkgs.callPackage naersk {
-            cargo = pkgs.cargo;
-            rustc = pkgs.rustc;
+            cargo = rust-toolchain-core;
+            rustc = rust-toolchain-core;
           };
         in
         rec {
@@ -98,18 +106,21 @@
         system:
         let
           pkgs = nixpkgs.legacyPackages."${system}";
+          rust-toolchain = pkgs.symlinkJoin {
+            name = "rust-toolchain";
+            paths = with pkgs; [
+              (make-rust-toolchain-core pkgs)
+              rustfmt
+              clippy
+              cargo-expand
+            ];
+          };
         in
         {
           default = pkgs.mkShell rec {
             inputsFrom = [ self.packages.${system}.default ];
-            packages = with pkgs; [
-              rustfmt
-              cargo-expand
-              clippy
-            ];
-           # LD_LIBRARY_PATH = "${pkgs.lib.makeLibraryPath (
-           #   builtins.concatMap (d: d.runtimeDependencies) inputsFrom
-           # )}";
+            packages = [ rust-toolchain ];
+            LD_LIBRARY_PATH = "${pkgs.lib.makeLibraryPath (builtins.concatMap (d: d.buildInputs) inputsFrom)}";
             RUST_SRC_PATH = "${pkgs.rust.packages.stable.rustPlatform.rustLibSrc}";
           };
         }
