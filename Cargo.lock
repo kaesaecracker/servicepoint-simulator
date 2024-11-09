@@ -1764,9 +1764,9 @@ dependencies = [
 
 [[package]]
 name = "servicepoint"
-version = "0.9.1"
+version = "0.10.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d7e803bc88f44d834cf52731e09392f68f9462eebaa68d3b4a406f26b41452b9"
+checksum = "25fd266845654e7e643cf32a9e69dd20ce2b62cf54557937d4d0d41bf27a050f"
 dependencies = [
  "bitvec",
  "bzip2",

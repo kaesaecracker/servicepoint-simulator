@@ -4,24 +4,24 @@ use font_kit::font::Font;
 use font_kit::hinting::HintingOptions;
 use pathfinder_geometry::transform2d::Transform2F;
 use pathfinder_geometry::vector::{vec2f, vec2i};
-use servicepoint::{Grid, PixelGrid, TILE_SIZE};
+use servicepoint::{Bitmap, Grid, TILE_SIZE};
 
 const DEFAULT_FONT_FILE: &[u8] = include_bytes!("../Web437_IBM_BIOS.woff");
 
 const CHAR_COUNT: usize = u8::MAX as usize + 1;
 
 pub struct BitmapFont {
-    bitmaps: [PixelGrid; CHAR_COUNT],
+    bitmaps: [Bitmap; CHAR_COUNT],
 }
 
 impl BitmapFont {
-    pub fn new(bitmaps: [PixelGrid; CHAR_COUNT]) -> Self {
+    pub fn new(bitmaps: [Bitmap; CHAR_COUNT]) -> Self {
         Self { bitmaps }
     }
 
     pub fn load(font: Font, size: usize) -> BitmapFont {
         let mut bitmaps =
-            core::array::from_fn(|_| PixelGrid::new(TILE_SIZE, TILE_SIZE));
+            core::array::from_fn(|_| Bitmap::new(TILE_SIZE, TILE_SIZE));
         let mut canvas =
             Canvas::new(vec2i(size as i32, size as i32), Format::A8);
         let size_f = size as f32;
@@ -61,7 +61,7 @@ impl BitmapFont {
         Self::new(bitmaps)
     }
 
-    pub fn get_bitmap(&self, char_code: u8) -> &PixelGrid {
+    pub fn get_bitmap(&self, char_code: u8) -> &Bitmap {
         &self.bitmaps[char_code as usize]
     }
 }

@@ -50,7 +50,7 @@ fn main() {
         .set_nonblocking(true)
         .expect("could not enter non blocking mode");
 
-    let display = RwLock::new(PixelGrid::new(PIXEL_WIDTH, PIXEL_HEIGHT));
+    let display = RwLock::new(Bitmap::new(PIXEL_WIDTH, PIXEL_HEIGHT));
 
     let mut luma = BrightnessGrid::new(TILE_WIDTH, TILE_HEIGHT);
     luma.fill(Brightness::MAX);
@@ -60,7 +60,7 @@ fn main() {
 }
 
 fn run(
-    display_ref: &RwLock<PixelGrid>,
+    display_ref: &RwLock<Bitmap>,
     luma_ref: &RwLock<BrightnessGrid>,
     socket: UdpSocket,
     font: BitmapFont,

@@ -2,7 +2,7 @@ use std::sync::{RwLock, RwLockWriteGuard};
 
 use log::{debug, error, info, trace, warn};
 use servicepoint::{
-    BrightnessGrid, Command, Cp437Grid, Grid, Origin, PixelGrid, Tiles,
+    Bitmap, BrightnessGrid, Command, Cp437Grid, Grid, Origin, Tiles,
     PIXEL_COUNT, PIXEL_WIDTH, TILE_SIZE,
 };
 
@@ -11,7 +11,7 @@ use crate::font::BitmapFont;
 pub(crate) fn execute_command(
     command: Command,
     font: &BitmapFont,
-    display_ref: &RwLock<PixelGrid>,
+    display_ref: &RwLock<Bitmap>,
     luma_ref: &RwLock<BrightnessGrid>,
 ) -> bool {
     debug!("received {command:?}");
@@ -120,7 +120,7 @@ fn print_cp437_data(
     origin: Origin<Tiles>,
     grid: &Cp437Grid,
     font: &BitmapFont,
-    display: &mut RwLockWriteGuard<PixelGrid>,
+    display: &mut RwLockWriteGuard<Bitmap>,
 ) {
     let Origin { x, y, .. } = origin;
     for char_y in 0usize..grid.height() {
@@ -152,8 +152,8 @@ fn print_cp437_data(
 fn print_pixel_grid(
     offset_x: usize,
     offset_y: usize,
-    pixels: &PixelGrid,
-    display: &mut RwLockWriteGuard<PixelGrid>,
+    pixels: &Bitmap,
+    display: &mut RwLockWriteGuard<Bitmap>,
 ) -> bool {
     debug!(
         "printing {}x{} grid at {offset_x} {offset_y}",

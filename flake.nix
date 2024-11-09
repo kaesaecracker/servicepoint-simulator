@@ -98,6 +98,7 @@
             packages = with pkgs; [
               rustfmt
               cargo-expand
+              clippy
             ];
            # LD_LIBRARY_PATH = "${pkgs.lib.makeLibraryPath (
            #   builtins.concatMap (d: d.runtimeDependencies) inputsFrom

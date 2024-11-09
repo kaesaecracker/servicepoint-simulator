@@ -1,5 +1,5 @@
 use crate::font::BitmapFont;
-use servicepoint::{DataRef, PixelGrid, TILE_SIZE};
+use servicepoint::{Bitmap, DataRef, TILE_SIZE};
 
 /// Font from the display firmware `cape-cccb-apd/cp437font_linear.h`
 pub(crate) const CP437_FONT_LINEAR: [u64; 256] = [
@@ -263,7 +263,7 @@ pub(crate) const CP437_FONT_LINEAR: [u64; 256] = [
 
 pub fn load_static() -> BitmapFont {
     let mut bitmaps =
-        core::array::from_fn(|_| PixelGrid::new(TILE_SIZE, TILE_SIZE));
+        core::array::from_fn(|_| Bitmap::new(TILE_SIZE, TILE_SIZE));
 
     for (char_code, bitmap) in bitmaps.iter_mut().enumerate() {
         let bits = CP437_FONT_LINEAR[char_code];

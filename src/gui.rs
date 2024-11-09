@@ -2,10 +2,9 @@ use std::sync::mpsc::Sender;
 use std::sync::RwLock;
 
 use log::{info, warn};
-use pixels::wgpu::TextureFormat;
-use pixels::{Pixels, PixelsBuilder, SurfaceTexture};
+use pixels::{Pixels, SurfaceTexture};
 use servicepoint::{
-    Brightness, BrightnessGrid, Grid, PixelGrid, PIXEL_HEIGHT, PIXEL_WIDTH,
+    Bitmap, Brightness, BrightnessGrid, Grid, PIXEL_HEIGHT, PIXEL_WIDTH,
     TILE_SIZE,
 };
 use winit::application::ApplicationHandler;
@@ -18,7 +17,7 @@ use winit::window::{Window, WindowId};
 use crate::Cli;
 
 pub struct App<'t> {
-    display: &'t RwLock<PixelGrid>,
+    display: &'t RwLock<Bitmap>,
     luma: &'t RwLock<BrightnessGrid>,
     window: Option<Window>,
     pixels: Option<Pixels>,
@@ -36,7 +35,7 @@ pub enum AppEvents {
 
 impl<'t> App<'t> {
     pub fn new(
-        display: &'t RwLock<PixelGrid>,
+        display: &'t RwLock<Bitmap>,
         luma: &'t RwLock<BrightnessGrid>,
         stop_udp_tx: Sender<()>,
         cli: &'t Cli,
@@ -115,11 +114,13 @@ impl ApplicationHandler<AppEvents> for App<'_> {
 
         let pixels = {
             let window_size = window.inner_size();
-            let surface_texture = SurfaceTexture::new(window_size.width, window_size.height, &window);
-            Pixels::new(
-                size.width as u32,
-                size.height as u32,
-                surface_texture).unwrap()
+            let surface_texture = SurfaceTexture::new(
+                window_size.width,
+                window_size.height,
+                &window,
+            );
+            Pixels::new(size.width as u32, size.height as u32, surface_texture)
+                .unwrap()
         };
 
         self.pixels = Some(pixels);
