@@ -113,15 +113,14 @@ impl ApplicationHandler<AppEvents> for App<'_> {
         self.window = Some(window);
         let window = self.window.as_ref().unwrap();
 
-        let window_size = window.inner_size();
-        let pixels = PixelsBuilder::new(
-            size.width as u32,
-            size.height as u32,
-            SurfaceTexture::new(window_size.width, window_size.height, &window),
-        )
-        .render_texture_format(TextureFormat::Bgra8UnormSrgb)
-        .build()
-        .expect("could not create pixels");
+        let pixels = {
+            let window_size = window.inner_size();
+            let surface_texture = SurfaceTexture::new(window_size.width, window_size.height, &window);
+            Pixels::new(
+                size.width as u32,
+                size.height as u32,
+                surface_texture).unwrap()
+        };
 
         self.pixels = Some(pixels);
     }
