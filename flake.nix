@@ -7,6 +7,10 @@
       url = "github:nix-community/naersk";
       inputs.nixpkgs.follows = "nixpkgs";
     };
+    nix-filter = {
+      url = "github:numtide/nix-filter";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
   };
 
   outputs =
@@ -14,6 +18,7 @@
       self,
       nixpkgs,
       naersk,
+      nix-filter,
     }:
     let
       lib = nixpkgs.lib;
@@ -37,7 +42,17 @@
         in
         rec {
           servicepoint-simulator = naersk'.buildPackage rec {
-            src = ./.;
+            src = nix-filter.lib.filter {
+              root = ./.;
+              include = [
+                ./Cargo.toml
+                ./Cargo.lock
+                ./src
+                ./Web437_IBM_BIOS.woff
+                ./README.md
+                ./LICENSE
+              ];
+            };
             nativeBuildInputs = with pkgs; [
               pkg-config
               makeWrapper
@@ -71,14 +86,6 @@
               wrapProgram $out/bin/servicepoint-simulator \
                 --suffix LD_LIBRARY_PATH : ${lib.makeLibraryPath buildInputs}
             '';
-
-            #postFixup = ''
-            #  patchelf $out/bin/servicepoint-simulator --add-rpath ${pkgs.lib.makeLibraryPath buildInputs}
-            #'';
-
-            #postInstall = ''
-            #  patchelf $out/bin/servicepoint-simulator --add-rpath ${pkgs.lib.makeLibraryPath buildInputs}
-            #'';
           };
 
           default = servicepoint-simulator;
