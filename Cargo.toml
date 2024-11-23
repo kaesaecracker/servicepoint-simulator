@@ -16,7 +16,7 @@ pixels = "0.14"
 pathfinder_geometry = "0.5.1"
 
 [dependencies.servicepoint]
-version = "0.11.0"
+version = "0.12.0"
 features = ["all_compressions"]
 
 [dependencies.winit]
