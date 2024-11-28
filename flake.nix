@@ -88,6 +88,14 @@
                   xorg.libX11
                   xorg.libX11.dev
                 ]
+              ))
+              ++ (lib.optionals pkgs.stdenv.isDarwin (
+                with pkgs.darwin.apple_sdk.frameworks;
+                [
+                  Carbon
+                  QuartzCore
+                  AppKit
+                ]
               ));
 
             postInstall = ''
