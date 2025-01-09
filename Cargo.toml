@@ -14,6 +14,7 @@ clap = { version = "4.5", features = ["derive"] }
 pixels = "0.14"
 # I should not need this as a direct dependency, but then I cannot spell the types needed to use font-kit...
 pathfinder_geometry = "0.5.1"
+font-kit = "0.14.2"
 
 [dependencies.servicepoint]
 version = "0.12.0"
@@ -24,11 +25,3 @@ version = "0.30"
 features = ["rwh_05"]
 default-features = true
 
-[target.'cfg(target_os = "linux")'.dependencies.font-kit]
-version = "0.14.2"
-features = ["loader-freetype-default", "source-fontconfig-dlopen"]
-default-features = false
-
-[target.'cfg(target_os = "macos")'.dependencies.font-kit]
-version = "0.14.2"
-default-features = true

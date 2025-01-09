@@ -2,7 +2,7 @@
   description = "Flake for servicepoint-simulator";
 
   inputs = {
-    nixpkgs.url = "github:nixos/nixpkgs/nixos-24.05";
+    nixpkgs.url = "github:nixos/nixpkgs/nixos-24.11";
     nix-filter.url = "github:numtide/nix-filter";
     naersk = {
       url = "github:nix-community/naersk";
@@ -70,13 +70,25 @@
               with pkgs;
               [
                 xe
-                lzma
+                xz
               ]
-              ++ (lib.optionals pkgs.stdenv.isLinux (
+              ++ lib.optionals pkgs.stdenv.isLinux (
                 with pkgs;
                 [
-                  libxkbcommon
+                  # gpu
                   libGL
+                  vulkan-headers
+                  vulkan-loader
+                  vulkan-tools vulkan-tools-lunarg
+                  vulkan-extension-layer
+                  vulkan-validation-layers
+
+                  # keyboard
+                  libxkbcommon
+
+                   # font loading
+                  fontconfig
+                  freetype
 
                   # WINIT_UNIX_BACKEND=wayland
                   wayland
@@ -88,15 +100,15 @@
                   xorg.libX11
                   xorg.libX11.dev
                 ]
-              ))
-              ++ (lib.optionals pkgs.stdenv.isDarwin (
+              )
+              ++ lib.optionals pkgs.stdenv.isDarwin (
                 with pkgs.darwin.apple_sdk.frameworks;
                 [
                   Carbon
                   QuartzCore
                   AppKit
                 ]
-              ));
+              );
 
             postInstall = ''
               wrapProgram $out/bin/servicepoint-simulator \
