@@ -20,9 +20,9 @@ pub struct App<'t> {
     display: &'t RwLock<Bitmap>,
     luma: &'t RwLock<BrightnessGrid>,
     window: Option<Window>,
-    pixels: Option<Pixels>,
     stop_udp_tx: Sender<()>,
     cli: &'t Cli,
+    logical_size: LogicalSize<u16>,
 }
 
 const SPACER_HEIGHT: usize = 4;
@@ -40,18 +40,42 @@ impl<'t> App<'t> {
         stop_udp_tx: Sender<()>,
         cli: &'t Cli,
     ) -> Self {
+        let logical_size = {
+            let height = if cli.spacers {
+                let num_spacers = (PIXEL_HEIGHT / TILE_SIZE) - 1;
+                PIXEL_HEIGHT + num_spacers * SPACER_HEIGHT
+            } else {
+                PIXEL_HEIGHT
+            };
+            LogicalSize::new(PIXEL_WIDTH as u16, height as u16)
+        };
+
         App {
             display,
             luma,
             stop_udp_tx,
-            pixels: None,
             window: None,
             cli,
+            logical_size,
         }
     }
 
     fn draw(&mut self) {
-        let pixels = self.pixels.as_mut().unwrap();
+        let window = self.window.as_ref().unwrap();
+        let mut pixels = {
+            let window_size = window.inner_size();
+            let surface_texture = SurfaceTexture::new(
+                window_size.width,
+                window_size.height,
+                &window,
+            );
+            Pixels::new(
+                self.logical_size.width as u32,
+                self.logical_size.height as u32,
+                surface_texture,
+            )
+            .unwrap()
+        };
 
         let mut frame = pixels.frame_mut().chunks_exact_mut(4);
         let display = self.display.read().unwrap();
@@ -95,35 +119,13 @@ impl<'t> App<'t> {
 
 impl ApplicationHandler<AppEvents> for App<'_> {
     fn resumed(&mut self, event_loop: &ActiveEventLoop) {
-        let height = if self.cli.spacers {
-            let num_spacers = (PIXEL_HEIGHT / TILE_SIZE) - 1;
-            PIXEL_HEIGHT + num_spacers * SPACER_HEIGHT
-        } else {
-            PIXEL_HEIGHT
-        };
-
-        let size = LogicalSize::new(PIXEL_WIDTH as u16, height as u16);
         let attributes = Window::default_attributes()
             .with_title("servicepoint-simulator")
-            .with_inner_size(size)
+            .with_inner_size(self.logical_size)
             .with_transparent(false);
 
         let window = event_loop.create_window(attributes).unwrap();
         self.window = Some(window);
-        let window = self.window.as_ref().unwrap();
-
-        let pixels = {
-            let window_size = window.inner_size();
-            let surface_texture = SurfaceTexture::new(
-                window_size.width,
-                window_size.height,
-                &window,
-            );
-            Pixels::new(size.width as u32, size.height as u32, surface_texture)
-                .unwrap()
-        };
-
-        self.pixels = Some(pixels);
     }
 
     fn user_event(&mut self, event_loop: &ActiveEventLoop, event: AppEvents) {

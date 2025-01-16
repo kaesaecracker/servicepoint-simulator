@@ -1,16 +1,17 @@
-use std::sync::{RwLock, RwLockWriteGuard};
-
 use log::{debug, error, info, trace, warn};
 use servicepoint::{
-    Bitmap, BrightnessGrid, Command, Cp437Grid, Grid, Origin, Tiles,
+    Bitmap, BrightnessGrid, CharGrid, Command, Cp437Grid, Grid, Origin, Tiles,
     PIXEL_COUNT, PIXEL_WIDTH, TILE_SIZE,
 };
+use std::sync::{RwLock, RwLockWriteGuard};
 
-use crate::font::BitmapFont;
+use crate::font::Cp437Font;
+use crate::font_renderer::FontRenderer8x8;
 
 pub(crate) fn execute_command(
     command: Command,
-    font: &BitmapFont,
+    cp436_font: &Cp437Font,
+    utf8_font: &FontRenderer8x8,
     display_ref: &RwLock<Bitmap>,
     luma_ref: &RwLock<BrightnessGrid>,
 ) -> bool {
@@ -30,7 +31,7 @@ pub(crate) fn execute_command(
         }
         Command::Cp437Data(origin, grid) => {
             let mut display = display_ref.write().unwrap();
-            print_cp437_data(origin, &grid, font, &mut display);
+            print_cp437_data(origin, &grid, cp436_font, &mut display);
         }
         #[allow(deprecated)]
         Command::BitmapLegacy => {
@@ -99,6 +100,10 @@ pub(crate) fn execute_command(
         Command::FadeOut => {
             error!("command not implemented: {command:?}")
         }
+        Command::Utf8Data(origin, grid) => {
+            let mut display = display_ref.write().unwrap();
+            print_utf8_data(origin, &grid, utf8_font, &mut display);
+        }
     };
 
     true
@@ -116,7 +121,7 @@ fn check_bitmap_valid(offset: u16, payload_len: usize) -> bool {
 fn print_cp437_data(
     origin: Origin<Tiles>,
     grid: &Cp437Grid,
-    font: &BitmapFont,
+    font: &Cp437Font,
     display: &mut RwLockWriteGuard<Bitmap>,
 ) {
     let Origin { x, y, .. } = origin;
@@ -139,6 +144,33 @@ fn print_cp437_data(
                 display,
             ) {
                 error!("stopping drawing text because char draw failed");
+                return;
+            }
+        }
+    }
+}
+
+fn print_utf8_data(
+    origin: Origin<Tiles>,
+    grid: &CharGrid,
+    font: &FontRenderer8x8,
+    display: &mut RwLockWriteGuard<Bitmap>,
+) {
+    let Origin { x, y, .. } = origin;
+    for char_y in 0usize..grid.height() {
+        for char_x in 0usize..grid.width() {
+            let char = grid.get(char_x, char_y);
+            trace!("drawing {char}");
+
+            let tile_x = char_x + x;
+            let tile_y = char_y + y;
+
+            if let Err(e) = font.render(
+                char,
+                display,
+                Origin::new(tile_x * TILE_SIZE, tile_y * TILE_SIZE),
+            ) {
+                error!("stopping drawing text because char draw failed: {e}");
                 return;
             }
         }

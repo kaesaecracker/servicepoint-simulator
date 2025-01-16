@@ -139,7 +139,7 @@
         {
           default = pkgs.mkShell rec {
             inputsFrom = [ self.packages.${system}.default ];
-            packages = [ rust-toolchain ];
+            packages = [ rust-toolchain pkgs.gdb ];
             LD_LIBRARY_PATH = "${pkgs.lib.makeLibraryPath (builtins.concatMap (d: d.buildInputs) inputsFrom)}";
             RUST_SRC_PATH = "${pkgs.rust.packages.stable.rustPlatform.rustLibSrc}";
           };

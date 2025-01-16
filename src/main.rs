@@ -11,13 +11,14 @@ use servicepoint::*;
 use winit::event_loop::{ControlFlow, EventLoop};
 
 use crate::execute_command::execute_command;
-use crate::font::BitmapFont;
+use crate::font::Cp437Font;
+use crate::font_renderer::FontRenderer8x8;
 use crate::gui::{App, AppEvents};
 
 mod execute_command;
 mod font;
+mod font_renderer;
 mod gui;
-mod static_font;
 
 #[derive(Parser, Debug)]
 struct Cli {
@@ -56,14 +57,14 @@ fn main() {
     luma.fill(Brightness::MAX);
     let luma = RwLock::new(luma);
 
-    run(&display, &luma, socket, BitmapFont::default(), &cli);
+    run(&display, &luma, socket, Cp437Font::default(), &cli);
 }
 
 fn run(
     display_ref: &RwLock<Bitmap>,
     luma_ref: &RwLock<BrightnessGrid>,
     socket: UdpSocket,
-    font: BitmapFont,
+    cp437_font: Cp437Font,
     cli: &Cli,
 ) {
     let (stop_udp_tx, stop_udp_rx) = mpsc::channel();
@@ -80,6 +81,7 @@ fn run(
     std::thread::scope(move |scope| {
         let udp_thread = scope.spawn(move || {
             let mut buf = [0; 8985];
+            let utf8_font = FontRenderer8x8::default();
 
             while stop_udp_rx.try_recv().is_err() {
                 let (amount, _) = match socket.recv_from(&mut buf) {
@@ -98,8 +100,8 @@ fn run(
                     );
                 }
 
-                let package = match servicepoint::packet::Packet::try_from(&buf[..amount]) {
-                    Err(_) =>  {
+                let package = match servicepoint::Packet::try_from(&buf[..amount]) {
+                    Err(_) => {
                         warn!("could not load packet with length {amount} into header");
                         continue;
                     }
@@ -114,7 +116,7 @@ fn run(
                     Ok(val) => val,
                 };
 
-                if !execute_command(command, &font, display_ref, luma_ref) {
+                if !execute_command(command, &cp437_font, &utf8_font, display_ref, luma_ref) {
                     // hard reset
                     event_proxy
                         .send_event(AppEvents::UdpThreadClosed)
