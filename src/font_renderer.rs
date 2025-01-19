@@ -1,18 +1,33 @@
 use crate::font_renderer::RenderError::{GlyphNotFound, OutOfBounds};
-use font_kit::canvas::{Canvas, Format, RasterizationOptions};
-use font_kit::error::GlyphLoadingError;
-use font_kit::family_name::FamilyName;
-use font_kit::font::Font;
-use font_kit::hinting::HintingOptions;
-use font_kit::properties::Properties;
-use font_kit::source::SystemSource;
-use pathfinder_geometry::transform2d::Transform2F;
-use pathfinder_geometry::vector::{vec2f, vec2i};
+use font_kit::{
+    canvas::{Canvas, Format, RasterizationOptions},
+    error::GlyphLoadingError,
+    family_name::FamilyName,
+    font::Font,
+    hinting::HintingOptions,
+    properties::Properties,
+    source::SystemSource,
+};
+use pathfinder_geometry::{
+    transform2d::Transform2F,
+    vector::{vec2f, vec2i},
+};
 use servicepoint::{Bitmap, Grid, Origin, Pixels, TILE_SIZE};
 use std::sync::Mutex;
 
+struct SendFont(Font);
+
+// struct is only using primitives and pointers - lets try if it is only missing the declaration
+unsafe impl Send for SendFont {}
+
+impl AsRef<Font> for SendFont {
+    fn as_ref(&self) -> &Font {
+        &self.0
+    }
+}
+
 pub struct FontRenderer8x8 {
-    font: Font,
+    font: SendFont,
     canvas: Mutex<Canvas>,
     fallback_char: Option<u32>,
 }
@@ -35,7 +50,7 @@ impl FontRenderer8x8 {
         assert_eq!(canvas.stride, TILE_SIZE);
         let fallback_char = fallback_char.and_then(|c| font.glyph_for_char(c));
         let result = Self {
-            font,
+            font: SendFont(font),
             fallback_char,
             canvas: Mutex::new(canvas),
         };
@@ -49,14 +64,18 @@ impl FontRenderer8x8 {
         offset: Origin<Pixels>,
     ) -> Result<(), RenderError> {
         let mut canvas = self.canvas.lock().unwrap();
-        let glyph_id = self.font.glyph_for_char(char).or(self.fallback_char);
+        let glyph_id = self
+            .font
+            .as_ref()
+            .glyph_for_char(char)
+            .or(self.fallback_char);
         let glyph_id = match glyph_id {
             None => return Err(GlyphNotFound(char)),
             Some(val) => val,
         };
 
         canvas.pixels.fill(0);
-        self.font.rasterize_glyph(
+        self.font.as_ref().rasterize_glyph(
             &mut canvas,
             glyph_id,
             TILE_SIZE as f32,
@@ -85,7 +104,14 @@ impl FontRenderer8x8 {
 impl Default for FontRenderer8x8 {
     fn default() -> Self {
         let utf8_font = SystemSource::new()
-            .select_best_match(&[FamilyName::Monospace], &Properties::new())
+            .select_best_match(
+                &[
+                    FamilyName::Title("Roboto Mono".to_string()),
+                    FamilyName::Title("Fira Mono".to_string()),
+                    FamilyName::Monospace,
+                ],
+                &Properties::new(),
+            )
             .unwrap()
             .load()
             .unwrap();

@@ -1,3 +1,4 @@
+use std::slice::ChunksExactMut;
 use std::sync::mpsc::Sender;
 use std::sync::RwLock;
 
@@ -62,24 +63,25 @@ impl<'t> App<'t> {
 
     fn draw(&mut self) {
         let window = self.window.as_ref().unwrap();
-        let mut pixels = {
-            let window_size = window.inner_size();
-            let surface_texture = SurfaceTexture::new(
-                window_size.width,
-                window_size.height,
-                &window,
-            );
-            Pixels::new(
-                self.logical_size.width as u32,
-                self.logical_size.height as u32,
-                surface_texture,
-            )
-            .unwrap()
-        };
+        let window_size = window.inner_size();
+        let surface_texture =
+            SurfaceTexture::new(window_size.width, window_size.height, &window);
+        let mut pixels = Pixels::new(
+            self.logical_size.width as u32,
+            self.logical_size.height as u32,
+            surface_texture,
+        )
+        .unwrap();
 
         let mut frame = pixels.frame_mut().chunks_exact_mut(4);
+        self.draw_frame(&mut frame);
+        pixels.render().expect("could not render");
+    }
+
+    fn draw_frame(&self, frame: &mut ChunksExactMut<u8>) {
         let display = self.display.read().unwrap();
         let luma = self.luma.read().unwrap();
+
         for y in 0..PIXEL_HEIGHT {
             if self.cli.spacers && y != 0 && y % TILE_SIZE == 0 {
                 // cannot just frame.skip(PIXEL_WIDTH as usize * SPACER_HEIGHT as usize) because of typing
@@ -90,30 +92,29 @@ impl<'t> App<'t> {
 
             for x in 0..PIXEL_WIDTH {
                 let is_set = display.get(x, y);
-                let brightness: u8 =
-                    luma.get(x / TILE_SIZE, y / TILE_SIZE).into();
-                let max_brightness: u8 = Brightness::MAX.into();
-                let scale: f32 = (u8::MAX as f32) / (max_brightness as f32);
-
+                let brightness =
+                    u8::from(luma.get(x / TILE_SIZE, y / TILE_SIZE));
+                let scale =
+                    (u8::MAX as f32) / (u8::from(Brightness::MAX) as f32);
                 let brightness = (scale * brightness as f32) as u8;
-
-                let color = if is_set {
-                    [
-                        if self.cli.red { brightness } else { 0u8 },
-                        if self.cli.green { brightness } else { 0u8 },
-                        if self.cli.blue { brightness } else { 0u8 },
-                        255,
-                    ]
-                } else {
-                    [0u8, 0, 0, 255]
-                };
-
+                let color = self.get_color(is_set, brightness);
                 let pixel = frame.next().unwrap();
                 pixel.copy_from_slice(&color);
             }
         }
+    }
 
-        pixels.render().expect("could not render");
+    fn get_color(&self, is_set: bool, brightness: u8) -> [u8; 4] {
+        if is_set {
+            [
+                if self.cli.red { brightness } else { 0u8 },
+                if self.cli.green { brightness } else { 0u8 },
+                if self.cli.blue { brightness } else { 0u8 },
+                255,
+            ]
+        } else {
+            [0u8, 0, 0, 255]
+        }
     }
 }
 
