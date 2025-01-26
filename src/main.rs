@@ -29,7 +29,7 @@ fn main() {
         cli.gui.green = true;
     }
 
-    init_logging(cli.debug);
+    init_logging(cli.verbose);
     info!("starting with args: {:?}", &cli);
 
     let socket = UdpSocket::bind(&cli.bind).expect("could not bind socket");
