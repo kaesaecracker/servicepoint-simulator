@@ -25,99 +25,24 @@
         "aarch64-darwin"
         "x86_64-darwin"
       ];
-      forAllSystems = lib.genAttrs supported-systems;
-      make-rust-toolchain-core =
-        pkgs:
-        pkgs.symlinkJoin {
-          name = "rust-toolchain-core";
-          paths = with pkgs; [
-            rustc
-            cargo
-            rustPlatform.rustcSrc
-          ];
-        };
+      forAllSystems =
+        f:
+        lib.genAttrs supported-systems (
+          system:
+          f rec {
+            pkgs = nixpkgs.legacyPackages.${system};
+            inherit system;
+          }
+        );
     in
     rec {
       packages = forAllSystems (
-        system:
-        let
-          pkgs = nixpkgs.legacyPackages."${system}";
-          rust-toolchain-core = make-rust-toolchain-core pkgs;
-          naersk' = pkgs.callPackage naersk {
-            cargo = rust-toolchain-core;
-            rustc = rust-toolchain-core;
-          };
-        in
+        { pkgs, ... }:
         rec {
-          servicepoint-simulator = naersk'.buildPackage rec {
-            src = nix-filter.lib.filter {
-              root = ./.;
-              include = [
-                ./Cargo.toml
-                ./Cargo.lock
-                ./src
-                ./Web437_IBM_BIOS.woff
-                ./README.md
-                ./LICENSE
-              ];
-            };
-            nativeBuildInputs = with pkgs; [
-              pkg-config
-              makeWrapper
-            ];
-            strictDeps = true;
-            buildInputs =
-              with pkgs;
-              [
-                xe
-                xz
-
-                roboto
-              ]
-              ++ lib.optionals pkgs.stdenv.isLinux (
-                with pkgs;
-                [
-                  # gpu
-                  libGL
-                  vulkan-headers
-                  vulkan-loader
-                  vulkan-tools vulkan-tools-lunarg
-                  vulkan-extension-layer
-                  vulkan-validation-layers
-
-                  # keyboard
-                  libxkbcommon
-
-                   # font loading
-                  fontconfig
-                  freetype
-
-                  # WINIT_UNIX_BACKEND=wayland
-                  wayland
-
-                  # WINIT_UNIX_BACKEND=x11
-                  xorg.libXcursor
-                  xorg.libXrandr
-                  xorg.libXi
-                  xorg.libX11
-                  xorg.libX11.dev
-                ]
-              )
-              ++ lib.optionals pkgs.stdenv.isDarwin (
-                with pkgs.darwin.apple_sdk.frameworks;
-                [
-                  Carbon
-                  QuartzCore
-                  AppKit
-                ]
-              );
-
-            postInstall = ''
-              wrapProgram $out/bin/servicepoint-simulator \
-                --suffix LD_LIBRARY_PATH : ${lib.makeLibraryPath buildInputs}
-            '';
+          servicepoint-simulator = import ./servicepoint-simulator.nix {
+            inherit nix-filter pkgs;
+            naersk' = pkgs.callPackage naersk { };
           };
-
           default = servicepoint-simulator;
         }
       );
@@ -125,29 +50,35 @@
       legacyPackages = packages;
 
       devShells = forAllSystems (
-        system:
-        let
-          pkgs = nixpkgs.legacyPackages."${system}";
-          rust-toolchain = pkgs.symlinkJoin {
-            name = "rust-toolchain";
-            paths = with pkgs; [
-              (make-rust-toolchain-core pkgs)
-              rustfmt
-              clippy
-              cargo-expand
-            ];
-          };
-        in
+        {
+          pkgs,
+          system,
+        }:
         {
           default = pkgs.mkShell rec {
             inputsFrom = [ self.packages.${system}.default ];
-            packages = [ rust-toolchain pkgs.gdb ];
+            packages = [
+              pkgs.gdb
+              (pkgs.symlinkJoin {
+                name = "rust-toolchain";
+                paths = with pkgs; [
+                  rustc
+                  cargo
+                  rustPlatform.rustcSrc
+                  rustfmt
+                  clippy
+                  cargo-expand
+                ];
+              })
+            ];
             LD_LIBRARY_PATH = "${pkgs.lib.makeLibraryPath (builtins.concatMap (d: d.buildInputs) inputsFrom)}";
+            NIX_LD_LIBRARY_PATH = LD_LIBRARY_PATH;
+            NIX_LD = pkgs.stdenv.cc.bintools.dynamicLinker;
             RUST_SRC_PATH = "${pkgs.rust.packages.stable.rustPlatform.rustLibSrc}";
           };
         }
       );
 
-      formatter = forAllSystems (system: nixpkgs.legacyPackages."${system}".nixfmt-rfc-style);
+      formatter = forAllSystems ({ pkgs, ... }: pkgs.nixfmt-rfc-style);
     };
 }
