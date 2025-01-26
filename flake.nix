@@ -71,6 +71,8 @@
               [
                 xe
                 xz
+
+                roboto
               ]
               ++ lib.optionals pkgs.stdenv.isLinux (
                 with pkgs;

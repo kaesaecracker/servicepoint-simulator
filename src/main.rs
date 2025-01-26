@@ -1,9 +1,11 @@
 #![deny(clippy::all)]
 
-use crate::execute_command::CommandExecutor;
-use crate::gui::{App, AppEvents};
+use crate::{
+    execute_command::{CommandExecutor, ExecutionResult},
+    gui::{AppEvents, Gui},
+};
 use clap::Parser;
-use log::{info, warn, LevelFilter};
+use log::{error, info, warn, LevelFilter};
 use servicepoint::*;
 use std::io::ErrorKind;
 use std::net::UdpSocket;
@@ -18,27 +20,62 @@ mod gui;
 
 #[derive(Parser, Debug)]
 struct Cli {
-    #[arg(long, default_value = "0.0.0.0:2342")]
+    #[arg(
+        long,
+        default_value = "0.0.0.0:2342",
+        help = "address and port to bind to"
+    )]
     bind: String,
-    #[arg(short, long, default_value_t = false)]
+    #[arg(
+        short,
+        long,
+        default_value_t = false,
+        help = "add spacers between tile rows to simulate gaps in real display"
+    )]
     spacers: bool,
-    #[arg(short, long, default_value_t = false)]
+    #[arg(
+        short,
+        long,
+        help = "Set default log level lower. You can also change this via the RUST_LOG environment variable."
+    )]
+    debug: bool,
+    #[arg(
+        short,
+        long,
+        default_value_t = false,
+        help = "Use the red color channel"
+    )]
     red: bool,
-    #[arg(short, long, default_value_t = false)]
+    #[arg(
+        short,
+        long,
+        default_value_t = false,
+        help = "Use the green color channel"
+    )]
     green: bool,
-    #[arg(short, long, default_value_t = false)]
+    #[arg(
+        short,
+        long,
+        default_value_t = false,
+        help = "Use the blue color channel"
+    )]
     blue: bool,
 }
 
 const BUF_SIZE: usize = 8985;
 
 fn main() {
+    let mut cli = Cli::parse();
+
     env_logger::builder()
-        .filter_level(LevelFilter::Info)
+        .filter_level(if cli.debug {
+            LevelFilter::Debug
+        } else {
+            LevelFilter::Info
+        })
         .parse_default_env()
         .init();
 
-    let mut cli = Cli::parse();
     if !(cli.red || cli.blue || cli.green) {
         cli.green = true;
     }
@@ -56,7 +93,7 @@ fn main() {
     let luma = RwLock::new(luma);
 
     let (stop_udp_tx, stop_udp_rx) = mpsc::channel();
-    let mut app = App::new(&display, &luma, stop_udp_tx, &cli);
+    let mut app = Gui::new(&display, &luma, stop_udp_tx, &cli);
 
     let event_loop = EventLoop::with_user_event()
         .build()
@@ -80,17 +117,21 @@ fn main() {
                     None => continue,
                 };
 
-                if !command_executor.execute(command) {
-                    // hard reset
-                    event_proxy
-                        .send_event(AppEvents::UdpThreadClosed)
-                        .expect("could not send close event");
-                    break;
+                match command_executor.execute(command) {
+                    ExecutionResult::Success => {
+                        event_proxy
+                            .send_event(AppEvents::UdpPacketHandled)
+                            .expect("could not send packet handled event");
+                    }
+                    ExecutionResult::Failure => {
+                        error!("failed to execute command");
+                    }
+                    ExecutionResult::Shutdown => {
+                        event_proxy
+                            .send_event(AppEvents::UdpThreadClosed)
+                            .expect("could not send close event");
+                    }
                 }
-
-                event_proxy
-                    .send_event(AppEvents::UdpPacketHandled)
-                    .expect("could not send packet handled event");
             }
         });
         event_loop
