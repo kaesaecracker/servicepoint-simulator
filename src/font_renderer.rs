@@ -13,7 +13,7 @@ use pathfinder_geometry::{
     vector::{vec2f, vec2i},
 };
 use servicepoint::{Bitmap, Grid, Origin, Pixels, TILE_SIZE};
-use std::sync::Mutex;
+use std::sync::{Mutex, MutexGuard};
 
 struct SendFont(Font);
 
@@ -76,14 +76,9 @@ impl FontRenderer8x8 {
         bitmap: &mut Bitmap,
         offset: Origin<Pixels>,
     ) -> Result<(), RenderError> {
-        let mut canvas = self.canvas.lock().unwrap();
-        let glyph_id = self
-            .font
-            .as_ref()
-            .glyph_for_char(char)
-            .or(self.fallback_char)
-            .ok_or_else(|| GlyphNotFound(char))?;
+        let glyph_id = self.get_glyph(char)?;
 
+        let mut canvas = self.canvas.lock().unwrap();
         canvas.pixels.fill(0);
         self.font.as_ref().rasterize_glyph(
             &mut canvas,
@@ -95,6 +90,14 @@ impl FontRenderer8x8 {
             RasterizationOptions::Bilevel,
         )?;
 
+        Self::copy_to_bitmap(canvas, bitmap, offset)
+    }
+
+    fn copy_to_bitmap(
+        canvas: MutexGuard<Canvas>,
+        bitmap: &mut Bitmap,
+        offset: Origin<Pixels>,
+    ) -> Result<(), RenderError> {
         for y in 0..TILE_SIZE {
             for x in 0..TILE_SIZE {
                 let canvas_val = canvas.pixels[x + y * TILE_SIZE] != 0;
@@ -105,8 +108,15 @@ impl FontRenderer8x8 {
                 }
             }
         }
-
         Ok(())
+    }
+
+    fn get_glyph(&self, char: char) -> Result<u32, RenderError> {
+        self.font
+            .as_ref()
+            .glyph_for_char(char)
+            .or(self.fallback_char)
+            .ok_or_else(|| GlyphNotFound(char))
     }
 }
 
