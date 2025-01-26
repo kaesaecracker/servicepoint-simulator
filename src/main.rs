@@ -1,75 +1,47 @@
 #![deny(clippy::all)]
 
+use crate::font_renderer::FontRenderer8x8;
+use crate::{
+    execute_command::{CommandExecutor, ExecutionResult},
+    gui::{AppEvents, Gui},
+};
+use clap::Parser;
+use cli::Cli;
+use log::{error, info, warn, LevelFilter};
+use servicepoint::*;
 use std::io::ErrorKind;
 use std::net::UdpSocket;
 use std::sync::{mpsc, RwLock};
 use std::time::Duration;
+use winit::event_loop::{ControlFlow, EventLoop, EventLoopProxy};
 
-use clap::Parser;
-use log::{info, warn, LevelFilter};
-use servicepoint::*;
-use winit::event_loop::{ControlFlow, EventLoop};
-
-use crate::execute_command::execute_command;
-use crate::font::Cp437Font;
-use crate::font_renderer::FontRenderer8x8;
-use crate::gui::{App, AppEvents};
-
+mod cli;
+mod cp437_font;
 mod execute_command;
-mod font;
 mod font_renderer;
 mod gui;
 
-#[derive(Parser, Debug)]
-struct Cli {
-    #[arg(long, default_value = "0.0.0.0:2342")]
-    bind: String,
-    #[arg(short, long, default_value_t = false)]
-    spacers: bool,
-    #[arg(short, long, default_value_t = false)]
-    red: bool,
-    #[arg(short, long, default_value_t = false)]
-    green: bool,
-    #[arg(short, long, default_value_t = false)]
-    blue: bool,
-}
+const BUF_SIZE: usize = 8985;
 
 fn main() {
-    env_logger::builder()
-        .filter_level(LevelFilter::Info)
-        .parse_default_env()
-        .init();
-
     let mut cli = Cli::parse();
-    if !(cli.red || cli.blue || cli.green) {
-        cli.green = true;
+    if !(cli.gui.red || cli.gui.blue || cli.gui.green) {
+        cli.gui.green = true;
     }
 
+    init_logging(cli.verbose);
     info!("starting with args: {:?}", &cli);
+
     let socket = UdpSocket::bind(&cli.bind).expect("could not bind socket");
     socket
         .set_nonblocking(true)
         .expect("could not enter non blocking mode");
 
     let display = RwLock::new(Bitmap::new(PIXEL_WIDTH, PIXEL_HEIGHT));
+    let luma = RwLock::new(BrightnessGrid::new(TILE_WIDTH, TILE_HEIGHT));
 
-    let mut luma = BrightnessGrid::new(TILE_WIDTH, TILE_HEIGHT);
-    luma.fill(Brightness::MAX);
-    let luma = RwLock::new(luma);
-
-    run(&display, &luma, socket, Cp437Font::default(), &cli);
-}
-
-fn run(
-    display_ref: &RwLock<Bitmap>,
-    luma_ref: &RwLock<BrightnessGrid>,
-    socket: UdpSocket,
-    cp437_font: Cp437Font,
-    cli: &Cli,
-) {
     let (stop_udp_tx, stop_udp_rx) = mpsc::channel();
-
-    let mut app = App::new(display_ref, luma_ref, stop_udp_tx, cli);
+    let mut gui = Gui::new(&display, &luma, stop_udp_tx, cli.gui);
 
     let event_loop = EventLoop::with_user_event()
         .build()
@@ -77,63 +49,94 @@ fn run(
     event_loop.set_control_flow(ControlFlow::Wait);
 
     let event_proxy = event_loop.create_proxy();
+    let font_renderer = cli
+        .font
+        .map(move |font| FontRenderer8x8::from_name(font))
+        .unwrap_or_else(move || FontRenderer8x8::default());
+    let command_executor = CommandExecutor::new(&display, &luma, font_renderer);
 
     std::thread::scope(move |scope| {
-        let udp_thread = scope.spawn(move || {
-            let mut buf = [0; 8985];
-            let utf8_font = FontRenderer8x8::default();
-
+        scope.spawn(move || {
+            let mut buf = [0; BUF_SIZE];
             while stop_udp_rx.try_recv().is_err() {
-                let (amount, _) = match socket.recv_from(&mut buf) {
-                    Err(err) if err.kind() == ErrorKind::WouldBlock => {
-                        std::thread::sleep(Duration::from_millis(1));
-                        continue;
-                    }
-                    Ok(result) => result,
-                    other => other.unwrap(),
-                };
-
-                if amount == buf.len() {
-                    warn!(
-                        "the received package may have been truncated to a length of {}",
-                        amount
-                    );
-                }
-
-                let package = match servicepoint::Packet::try_from(&buf[..amount]) {
-                    Err(_) => {
-                        warn!("could not load packet with length {amount} into header");
-                        continue;
-                    }
-                    Ok(package) => package,
-                };
-
-                let command = match Command::try_from(package) {
-                    Err(err) => {
-                        warn!("could not read command for packet: {:?}", err);
-                        continue;
-                    }
-                    Ok(val) => val,
-                };
-
-                if !execute_command(command, &cp437_font, &utf8_font, display_ref, luma_ref) {
-                    // hard reset
-                    event_proxy
-                        .send_event(AppEvents::UdpThreadClosed)
-                        .expect("could not send close event");
-                    break;
-                }
-
-                event_proxy
-                    .send_event(AppEvents::UdpPacketHandled)
-                    .expect("could not send packet handled event");
+                receive_into_buf(&socket, &mut buf)
+                    .and_then(move |amount| command_from_slice(&buf[..amount]))
+                    .map(|cmd| {
+                        handle_command(&event_proxy, &command_executor, cmd)
+                    });
             }
         });
-
         event_loop
-            .run_app(&mut app)
+            .run_app(&mut gui)
             .expect("could not run event loop");
-
-        udp_thread.join().expect("could not join udp thread");
     });
+}
+
+fn handle_command(
+    event_proxy: &EventLoopProxy<AppEvents>,
+    command_executor: &CommandExecutor,
+    command: Command,
+) {
+    match command_executor.execute(command) {
+        ExecutionResult::Success => {
+            event_proxy
+                .send_event(AppEvents::UdpPacketHandled)
+                .expect("could not send packet handled event");
+        }
+        ExecutionResult::Failure => {
+            error!("failed to execute command");
+        }
+        ExecutionResult::Shutdown => {
+            event_proxy
+                .send_event(AppEvents::UdpThreadClosed)
+                .expect("could not send close event");
+        }
+    }
+}
+
+fn init_logging(debug: bool) {
+    let filter = if debug {
+        LevelFilter::Debug
+    } else {
+        LevelFilter::Info
+    };
+    env_logger::builder()
+        .filter_level(filter)
+        .parse_default_env()
+        .init();
+}
+
+fn command_from_slice(slice: &[u8]) -> Option<Command> {
+    let packet = servicepoint::Packet::try_from(slice)
+        .inspect_err(|_| {
+            warn!("could not load packet with length {}", slice.len())
+        })
+        .ok()?;
+    Command::try_from(packet)
+        .inspect_err(move |err| {
+            warn!("could not read command for packet: {:?}", err)
+        })
+        .ok()
+}
+
+fn receive_into_buf(
+    socket: &UdpSocket,
+    buf: &mut [u8; BUF_SIZE],
+) -> Option<usize> {
+    let (amount, _) = match socket.recv_from(buf) {
+        Err(err) if err.kind() == ErrorKind::WouldBlock => {
+            std::thread::sleep(Duration::from_millis(1));
+            return None;
+        }
+        Ok(result) => result,
+        other => other.unwrap(),
+    };
+
+    if amount == buf.len() {
+        warn!(
+            "the received package may have been truncated to a length of {}",
+            amount
+        );
+    }
+    Some(amount)
 }

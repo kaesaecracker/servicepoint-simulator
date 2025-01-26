@@ -16,7 +16,9 @@ jobs:
 
     steps:
     - uses: actions/checkout@v4
-    - name: Install liblzma-dev
-      run: sudo apt-get install -y liblzma-dev
+
+    - name: Install system dependencies
+      run: sudo apt-get install -y liblzma-dev libfontconfig1-dev
+
     - name: Build
       run: cargo build --verbose

@@ -1,18 +1,33 @@
 use crate::font_renderer::RenderError::{GlyphNotFound, OutOfBounds};
-use font_kit::canvas::{Canvas, Format, RasterizationOptions};
-use font_kit::error::GlyphLoadingError;
-use font_kit::family_name::FamilyName;
-use font_kit::font::Font;
-use font_kit::hinting::HintingOptions;
-use font_kit::properties::Properties;
-use font_kit::source::SystemSource;
-use pathfinder_geometry::transform2d::Transform2F;
-use pathfinder_geometry::vector::{vec2f, vec2i};
+use font_kit::{
+    canvas::{Canvas, Format, RasterizationOptions},
+    error::GlyphLoadingError,
+    family_name::FamilyName,
+    font::Font,
+    hinting::HintingOptions,
+    properties::Properties,
+    source::SystemSource,
+};
+use pathfinder_geometry::{
+    transform2d::Transform2F,
+    vector::{vec2f, vec2i},
+};
 use servicepoint::{Bitmap, Grid, Origin, Pixels, TILE_SIZE};
-use std::sync::Mutex;
+use std::sync::{Mutex, MutexGuard};
+
+struct SendFont(Font);
+
+// struct is only using primitives and pointers - lets try if it is only missing the declaration
+unsafe impl Send for SendFont {}
+
+impl AsRef<Font> for SendFont {
+    fn as_ref(&self) -> &Font {
+        &self.0
+    }
+}
 
 pub struct FontRenderer8x8 {
-    font: Font,
+    font: SendFont,
     canvas: Mutex<Canvas>,
     fallback_char: Option<u32>,
 }
@@ -28,18 +43,31 @@ pub enum RenderError {
 }
 
 impl FontRenderer8x8 {
-    pub fn new(font: Font, fallback_char: Option<char>) -> Self {
+    const FALLBACK_CHAR: char = '?';
+    pub fn new(font: Font) -> Self {
         let canvas =
             Canvas::new(vec2i(TILE_SIZE as i32, TILE_SIZE as i32), Format::A8);
         assert_eq!(canvas.pixels.len(), TILE_SIZE * TILE_SIZE);
         assert_eq!(canvas.stride, TILE_SIZE);
-        let fallback_char = fallback_char.and_then(|c| font.glyph_for_char(c));
+        let fallback_char = font.glyph_for_char(Self::FALLBACK_CHAR);
         let result = Self {
-            font,
+            font: SendFont(font),
             fallback_char,
             canvas: Mutex::new(canvas),
         };
         result
+    }
+
+    pub fn from_name(family_name: String) -> Self {
+        let font = SystemSource::new()
+            .select_best_match(
+                &[FamilyName::Title(family_name)],
+                &Properties::new(),
+            )
+            .unwrap()
+            .load()
+            .unwrap();
+        Self::new(font)
     }
 
     pub fn render(
@@ -48,15 +76,11 @@ impl FontRenderer8x8 {
         bitmap: &mut Bitmap,
         offset: Origin<Pixels>,
     ) -> Result<(), RenderError> {
-        let mut canvas = self.canvas.lock().unwrap();
-        let glyph_id = self.font.glyph_for_char(char).or(self.fallback_char);
-        let glyph_id = match glyph_id {
-            None => return Err(GlyphNotFound(char)),
-            Some(val) => val,
-        };
+        let glyph_id = self.get_glyph(char)?;
 
+        let mut canvas = self.canvas.lock().unwrap();
         canvas.pixels.fill(0);
-        self.font.rasterize_glyph(
+        self.font.as_ref().rasterize_glyph(
             &mut canvas,
             glyph_id,
             TILE_SIZE as f32,
@@ -66,10 +90,17 @@ impl FontRenderer8x8 {
             RasterizationOptions::Bilevel,
         )?;
 
+        Self::copy_to_bitmap(canvas, bitmap, offset)
+    }
+
+    fn copy_to_bitmap(
+        canvas: MutexGuard<Canvas>,
+        bitmap: &mut Bitmap,
+        offset: Origin<Pixels>,
+    ) -> Result<(), RenderError> {
         for y in 0..TILE_SIZE {
             for x in 0..TILE_SIZE {
-                let index = x + y * TILE_SIZE;
-                let canvas_val = canvas.pixels[index] != 0;
+                let canvas_val = canvas.pixels[x + y * TILE_SIZE] != 0;
                 let bitmap_x = (offset.x + x) as isize;
                 let bitmap_y = (offset.y + y) as isize;
                 if !bitmap.set_optional(bitmap_x, bitmap_y, canvas_val) {
@@ -77,8 +108,15 @@ impl FontRenderer8x8 {
                 }
             }
         }
-
         Ok(())
+    }
+
+    fn get_glyph(&self, char: char) -> Result<u32, RenderError> {
+        self.font
+            .as_ref()
+            .glyph_for_char(char)
+            .or(self.fallback_char)
+            .ok_or_else(|| GlyphNotFound(char))
     }
 }
 
@@ -89,6 +127,6 @@ impl Default for FontRenderer8x8 {
             .unwrap()
             .load()
             .unwrap();
-        FontRenderer8x8::new(utf8_font, Some('?'))
+        FontRenderer8x8::new(utf8_font)
     }
 }

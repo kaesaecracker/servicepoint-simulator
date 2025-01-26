@@ -1,12 +1,10 @@
+use std::slice::ChunksExactMut;
 use std::sync::mpsc::Sender;
 use std::sync::RwLock;
 
 use log::{info, warn};
 use pixels::{Pixels, SurfaceTexture};
-use servicepoint::{
-    Bitmap, Brightness, BrightnessGrid, Grid, PIXEL_HEIGHT, PIXEL_WIDTH,
-    TILE_SIZE,
-};
+use servicepoint::*;
 use winit::application::ApplicationHandler;
 use winit::dpi::LogicalSize;
 use winit::event::WindowEvent;
@@ -14,18 +12,23 @@ use winit::event_loop::ActiveEventLoop;
 use winit::keyboard::KeyCode::KeyC;
 use winit::window::{Window, WindowId};
 
-use crate::Cli;
+use crate::cli::GuiOptions;
 
-pub struct App<'t> {
+pub struct Gui<'t> {
     display: &'t RwLock<Bitmap>,
     luma: &'t RwLock<BrightnessGrid>,
     window: Option<Window>,
     stop_udp_tx: Sender<()>,
-    cli: &'t Cli,
+    options: GuiOptions,
     logical_size: LogicalSize<u16>,
 }
 
 const SPACER_HEIGHT: usize = 4;
+const NUM_SPACERS: usize = (PIXEL_HEIGHT / TILE_SIZE) - 1;
+const PIXEL_HEIGHT_WITH_SPACERS: usize =
+    PIXEL_HEIGHT + NUM_SPACERS * SPACER_HEIGHT;
+
+const OFF_COLOR: [u8; 4] = [0u8, 0, 0, 255];
 
 #[derive(Debug)]
 pub enum AppEvents {
@@ -33,91 +36,99 @@ pub enum AppEvents {
     UdpThreadClosed,
 }
 
-impl<'t> App<'t> {
+impl<'t> Gui<'t> {
     pub fn new(
         display: &'t RwLock<Bitmap>,
         luma: &'t RwLock<BrightnessGrid>,
         stop_udp_tx: Sender<()>,
-        cli: &'t Cli,
+        options: GuiOptions,
     ) -> Self {
-        let logical_size = {
-            let height = if cli.spacers {
-                let num_spacers = (PIXEL_HEIGHT / TILE_SIZE) - 1;
-                PIXEL_HEIGHT + num_spacers * SPACER_HEIGHT
-            } else {
-                PIXEL_HEIGHT
-            };
-            LogicalSize::new(PIXEL_WIDTH as u16, height as u16)
-        };
-
-        App {
+        Gui {
+            window: None,
+            logical_size: Self::get_logical_size(options.spacers),
             display,
             luma,
             stop_udp_tx,
-            window: None,
-            cli,
-            logical_size,
+            options,
         }
     }
 
     fn draw(&mut self) {
         let window = self.window.as_ref().unwrap();
-        let mut pixels = {
-            let window_size = window.inner_size();
-            let surface_texture = SurfaceTexture::new(
-                window_size.width,
-                window_size.height,
-                &window,
-            );
-            Pixels::new(
-                self.logical_size.width as u32,
-                self.logical_size.height as u32,
-                surface_texture,
-            )
-            .unwrap()
-        };
+        let window_size = window.inner_size();
+        let surface_texture =
+            SurfaceTexture::new(window_size.width, window_size.height, &window);
+
+        // TODO: fix pixels: creating a new instance per draw crashes after some time on macOS,
+        // but keeping one instance for the lifetime of the Gui SIGSEGVs on Wayland when entering a background state.
+        let mut pixels = Pixels::new(
+            self.logical_size.width as u32,
+            self.logical_size.height as u32,
+            surface_texture,
+        )
+        .unwrap();
 
         let mut frame = pixels.frame_mut().chunks_exact_mut(4);
+        self.draw_frame(&mut frame);
+        pixels.render().expect("could not render");
+    }
+
+    fn draw_frame(&self, frame: &mut ChunksExactMut<u8>) {
         let display = self.display.read().unwrap();
         let luma = self.luma.read().unwrap();
-        for y in 0..PIXEL_HEIGHT {
-            if self.cli.spacers && y != 0 && y % TILE_SIZE == 0 {
+        let brightness_scale =
+            (u8::MAX as f32) / (u8::from(Brightness::MAX) as f32);
+
+        for tile_y in 0..TILE_HEIGHT {
+            if self.options.spacers && tile_y != 0 {
                 // cannot just frame.skip(PIXEL_WIDTH as usize * SPACER_HEIGHT as usize) because of typing
                 for _ in 0..PIXEL_WIDTH * SPACER_HEIGHT {
                     frame.next().unwrap();
                 }
             }
 
-            for x in 0..PIXEL_WIDTH {
-                let is_set = display.get(x, y);
-                let brightness: u8 =
-                    luma.get(x / TILE_SIZE, y / TILE_SIZE).into();
-                let max_brightness: u8 = Brightness::MAX.into();
-                let scale: f32 = (u8::MAX as f32) / (max_brightness as f32);
-
-                let brightness = (scale * brightness as f32) as u8;
-
-                let color = if is_set {
-                    [
-                        if self.cli.red { brightness } else { 0u8 },
-                        if self.cli.green { brightness } else { 0u8 },
-                        if self.cli.blue { brightness } else { 0u8 },
-                        255,
-                    ]
-                } else {
-                    [0u8, 0, 0, 255]
-                };
-
-                let pixel = frame.next().unwrap();
-                pixel.copy_from_slice(&color);
+            let start_y = tile_y * TILE_SIZE;
+            for y in start_y..start_y + TILE_SIZE {
+                for tile_x in 0..TILE_WIDTH {
+                    let brightness = u8::from(luma.get(tile_x, tile_y));
+                    let brightness =
+                        (brightness_scale * brightness as f32) as u8;
+                    let on_color = self.get_on_color(brightness);
+                    let start_x = tile_x * TILE_SIZE;
+                    for x in start_x..start_x + TILE_SIZE {
+                        let color = if display.get(x, y) {
+                            on_color
+                        } else {
+                            OFF_COLOR
+                        };
+                        let pixel = frame.next().unwrap();
+                        pixel.copy_from_slice(&color);
+                    }
+                }
             }
         }
+    }
 
-        pixels.render().expect("could not render");
+    fn get_on_color(&self, brightness: u8) -> [u8; 4] {
+        [
+            if self.options.red { brightness } else { 0u8 },
+            if self.options.green { brightness } else { 0u8 },
+            if self.options.blue { brightness } else { 0u8 },
+            255,
+        ]
+    }
+
+    fn get_logical_size(spacers: bool) -> LogicalSize<u16> {
+        let height = if spacers {
+            PIXEL_HEIGHT_WITH_SPACERS
+        } else {
+            PIXEL_HEIGHT
+        };
+        LogicalSize::new(PIXEL_WIDTH as u16, height as u16)
     }
 }
 
-impl ApplicationHandler<AppEvents> for App<'_> {
+impl ApplicationHandler<AppEvents> for Gui<'_> {
     fn resumed(&mut self, event_loop: &ActiveEventLoop) {
         let attributes = Window::default_attributes()
             .with_title("servicepoint-simulator")

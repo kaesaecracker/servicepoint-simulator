@@ -1,212 +1,246 @@
+use crate::cp437_font::Cp437Font;
+use crate::execute_command::ExecutionResult::{Failure, Shutdown, Success};
+use crate::font_renderer::FontRenderer8x8;
 use log::{debug, error, info, trace, warn};
 use servicepoint::{
-    Bitmap, BrightnessGrid, CharGrid, Command, Cp437Grid, Grid, Origin, Tiles,
-    PIXEL_COUNT, PIXEL_WIDTH, TILE_SIZE,
+    BitVec, Bitmap, BrightnessGrid, CharGrid, Command, Cp437Grid, Grid, Offset,
+    Origin, Tiles, PIXEL_COUNT, PIXEL_WIDTH, TILE_SIZE,
 };
-use std::sync::{RwLock, RwLockWriteGuard};
+use std::ops::{BitAnd, BitOr, BitXor};
+use std::sync::RwLock;
 
-use crate::font::Cp437Font;
-use crate::font_renderer::FontRenderer8x8;
-
-pub(crate) fn execute_command(
-    command: Command,
-    cp436_font: &Cp437Font,
-    utf8_font: &FontRenderer8x8,
-    display_ref: &RwLock<Bitmap>,
-    luma_ref: &RwLock<BrightnessGrid>,
-) -> bool {
-    debug!("received {command:?}");
-    match command {
-        Command::Clear => {
-            info!("clearing display");
-            display_ref.write().unwrap().fill(false);
-        }
-        Command::HardReset => {
-            warn!("display shutting down");
-            return false;
-        }
-        Command::BitmapLinearWin(Origin { x, y, .. }, pixels, _) => {
-            let mut display = display_ref.write().unwrap();
-            print_pixel_grid(x, y, &pixels, &mut display);
-        }
-        Command::Cp437Data(origin, grid) => {
-            let mut display = display_ref.write().unwrap();
-            print_cp437_data(origin, &grid, cp436_font, &mut display);
-        }
-        #[allow(deprecated)]
-        Command::BitmapLegacy => {
-            warn!("ignoring deprecated command {:?}", command);
-        }
-        // TODO: how to deduplicate this code in a rusty way?
-        Command::BitmapLinear(offset, vec, _) => {
-            if !check_bitmap_valid(offset as u16, vec.len()) {
-                return true;
-            }
-            let mut display = display_ref.write().unwrap();
-            for bitmap_index in 0..vec.len() {
-                let (x, y) = get_coordinates_for_index(offset, bitmap_index);
-                display.set(x, y, vec[bitmap_index]);
-            }
-        }
-        Command::BitmapLinearAnd(offset, vec, _) => {
-            if !check_bitmap_valid(offset as u16, vec.len()) {
-                return true;
-            }
-            let mut display = display_ref.write().unwrap();
-            for bitmap_index in 0..vec.len() {
-                let (x, y) = get_coordinates_for_index(offset, bitmap_index);
-                let old_value = display.get(x, y);
-                display.set(x, y, old_value && vec[bitmap_index]);
-            }
-        }
-        Command::BitmapLinearOr(offset, vec, _) => {
-            if !check_bitmap_valid(offset as u16, vec.len()) {
-                return true;
-            }
-            let mut display = display_ref.write().unwrap();
-            for bitmap_index in 0..vec.len() {
-                let (x, y) = get_coordinates_for_index(offset, bitmap_index);
-                let old_value = display.get(x, y);
-                display.set(x, y, old_value || vec[bitmap_index]);
-            }
-        }
-        Command::BitmapLinearXor(offset, vec, _) => {
-            if !check_bitmap_valid(offset as u16, vec.len()) {
-                return true;
-            }
-            let mut display = display_ref.write().unwrap();
-            for bitmap_index in 0..vec.len() {
-                let (x, y) = get_coordinates_for_index(offset, bitmap_index);
-                let old_value = display.get(x, y);
-                display.set(x, y, old_value ^ vec[bitmap_index]);
-            }
-        }
-        Command::CharBrightness(origin, grid) => {
-            let mut luma = luma_ref.write().unwrap();
-            for inner_y in 0..grid.height() {
-                for inner_x in 0..grid.width() {
-                    let brightness = grid.get(inner_x, inner_y);
-                    luma.set(
-                        origin.x + inner_x,
-                        origin.y + inner_y,
-                        brightness,
-                    );
-                }
-            }
-        }
-        Command::Brightness(brightness) => {
-            luma_ref.write().unwrap().fill(brightness);
-        }
-        Command::FadeOut => {
-            error!("command not implemented: {command:?}")
-        }
-        Command::Utf8Data(origin, grid) => {
-            let mut display = display_ref.write().unwrap();
-            print_utf8_data(origin, &grid, utf8_font, &mut display);
-        }
-    };
-
-    true
+pub struct CommandExecutor<'t> {
+    display: &'t RwLock<Bitmap>,
+    luma: &'t RwLock<BrightnessGrid>,
+    cp437_font: Cp437Font,
+    font_renderer: FontRenderer8x8,
 }
 
-fn check_bitmap_valid(offset: u16, payload_len: usize) -> bool {
-    if offset as usize + payload_len > PIXEL_COUNT {
-        error!("bitmap with offset {offset} is too big ({payload_len} bytes)");
-        return false;
+#[must_use]
+pub enum ExecutionResult {
+    Success,
+    Failure,
+    Shutdown,
+}
+
+impl<'t> CommandExecutor<'t> {
+    pub fn new(
+        display: &'t RwLock<Bitmap>,
+        luma: &'t RwLock<BrightnessGrid>,
+        font_renderer: FontRenderer8x8,
+    ) -> Self {
+        CommandExecutor {
+            display,
+            luma,
+            font_renderer,
+            cp437_font: Cp437Font::default(),
+        }
     }
 
-    true
-}
+    pub(crate) fn execute(&self, command: Command) -> ExecutionResult {
+        debug!("received {command:?}");
+        match command {
+            Command::Clear => {
+                info!("clearing display");
+                self.display.write().unwrap().fill(false);
+                Success
+            }
+            Command::HardReset => {
+                warn!("display shutting down");
+                Shutdown
+            }
+            Command::BitmapLinearWin(Origin { x, y, .. }, pixels, _) => {
+                self.print_pixel_grid(x, y, &pixels)
+            }
+            Command::Cp437Data(origin, grid) => {
+                self.print_cp437_data(origin, &grid)
+            }
+            #[allow(deprecated)]
+            Command::BitmapLegacy => {
+                warn!("ignoring deprecated command {:?}", command);
+                Failure
+            }
+            Command::BitmapLinearAnd(offset, vec, _) => {
+                self.execute_bitmap_linear(offset, vec, BitAnd::bitand)
+            }
+            Command::BitmapLinearOr(offset, vec, _) => {
+                self.execute_bitmap_linear(offset, vec, BitOr::bitor)
+            }
+            Command::BitmapLinearXor(offset, vec, _) => {
+                self.execute_bitmap_linear(offset, vec, BitXor::bitxor)
+            }
+            Command::BitmapLinear(offset, vec, _) => {
+                self.execute_bitmap_linear(offset, vec, move |_, new| new)
+            }
+            Command::CharBrightness(origin, grid) => {
+                self.execute_char_brightness(origin, grid)
+            }
+            Command::Brightness(brightness) => {
+                self.luma.write().unwrap().fill(brightness);
+                Success
+            }
+            Command::FadeOut => {
+                error!("command not implemented: {command:?}");
+                Success
+            }
+            Command::Utf8Data(origin, grid) => {
+                self.print_utf8_data(origin, &grid)
+            }
+        }
+    }
 
-fn print_cp437_data(
-    origin: Origin<Tiles>,
-    grid: &Cp437Grid,
-    font: &Cp437Font,
-    display: &mut RwLockWriteGuard<Bitmap>,
-) {
-    let Origin { x, y, .. } = origin;
-    for char_y in 0usize..grid.height() {
-        for char_x in 0usize..grid.width() {
-            let char_code = grid.get(char_x, char_y);
-            trace!(
+    fn execute_char_brightness(
+        &self,
+        origin: Origin<Tiles>,
+        grid: BrightnessGrid,
+    ) -> ExecutionResult {
+        let mut luma = self.luma.write().unwrap();
+        for inner_y in 0..grid.height() {
+            for inner_x in 0..grid.width() {
+                let brightness = grid.get(inner_x, inner_y);
+                luma.set(origin.x + inner_x, origin.y + inner_y, brightness);
+            }
+        }
+        Success
+    }
+
+    fn execute_bitmap_linear<Op>(
+        &self,
+        offset: Offset,
+        vec: BitVec,
+        op: Op,
+    ) -> ExecutionResult
+    where
+        Op: Fn(bool, bool) -> bool,
+    {
+        if !Self::check_bitmap_valid(offset as u16, vec.len()) {
+            return Failure;
+        }
+        let mut display = self.display.write().unwrap();
+        for bitmap_index in 0..vec.len() {
+            let (x, y) = Self::get_coordinates_for_index(offset, bitmap_index);
+            let old_value = display.get(x, y);
+            display.set(x, y, op(old_value, vec[bitmap_index]));
+        }
+        Success
+    }
+
+    fn check_bitmap_valid(offset: u16, payload_len: usize) -> bool {
+        if offset as usize + payload_len > PIXEL_COUNT {
+            error!(
+                "bitmap with offset {offset} is too big ({payload_len} bytes)"
+            );
+            return false;
+        }
+
+        true
+    }
+
+    fn print_cp437_data(
+        &self,
+        origin: Origin<Tiles>,
+        grid: &Cp437Grid,
+    ) -> ExecutionResult {
+        let font = &self.cp437_font;
+        let Origin { x, y, .. } = origin;
+        for char_y in 0usize..grid.height() {
+            for char_x in 0usize..grid.width() {
+                let char_code = grid.get(char_x, char_y);
+                trace!(
                 "drawing char_code {char_code:#04x} (if this was UTF-8, it would be {})",
                 char::from(char_code)
             );
 
-            let tile_x = char_x + x;
-            let tile_y = char_y + y;
+                let tile_x = char_x + x;
+                let tile_y = char_y + y;
 
-            let bitmap = font.get_bitmap(char_code);
-            if !print_pixel_grid(
-                tile_x * TILE_SIZE,
-                tile_y * TILE_SIZE,
-                bitmap,
-                display,
-            ) {
-                error!("stopping drawing text because char draw failed");
-                return;
+                match self.print_pixel_grid(
+                    tile_x * TILE_SIZE,
+                    tile_y * TILE_SIZE,
+                    &font[char_code],
+                ) {
+                    Success => {}
+                    Failure => {
+                        error!(
+                            "stopping drawing text because char draw failed"
+                        );
+                        return Failure;
+                    }
+                    Shutdown => return Shutdown,
+                }
             }
         }
+
+        Success
     }
-}
 
-fn print_utf8_data(
-    origin: Origin<Tiles>,
-    grid: &CharGrid,
-    font: &FontRenderer8x8,
-    display: &mut RwLockWriteGuard<Bitmap>,
-) {
-    let Origin { x, y, .. } = origin;
-    for char_y in 0usize..grid.height() {
-        for char_x in 0usize..grid.width() {
-            let char = grid.get(char_x, char_y);
-            trace!("drawing {char}");
+    fn print_utf8_data(
+        &self,
+        origin: Origin<Tiles>,
+        grid: &CharGrid,
+    ) -> ExecutionResult {
+        let mut display = self.display.write().unwrap();
 
-            let tile_x = char_x + x;
-            let tile_y = char_y + y;
+        let Origin { x, y, .. } = origin;
+        for char_y in 0usize..grid.height() {
+            for char_x in 0usize..grid.width() {
+                let char = grid.get(char_x, char_y);
+                trace!("drawing {char}");
 
-            if let Err(e) = font.render(
-                char,
-                display,
-                Origin::new(tile_x * TILE_SIZE, tile_y * TILE_SIZE),
-            ) {
-                error!("stopping drawing text because char draw failed: {e}");
-                return;
+                let tile_x = char_x + x;
+                let tile_y = char_y + y;
+
+                if let Err(e) = self.font_renderer.render(
+                    char,
+                    &mut display,
+                    Origin::new(tile_x * TILE_SIZE, tile_y * TILE_SIZE),
+                ) {
+                    error!(
+                        "stopping drawing text because char draw failed: {e}"
+                    );
+                    return Failure;
+                }
             }
         }
+
+        Success
     }
-}
 
-fn print_pixel_grid(
-    offset_x: usize,
-    offset_y: usize,
-    pixels: &Bitmap,
-    display: &mut RwLockWriteGuard<Bitmap>,
-) -> bool {
-    debug!(
-        "printing {}x{} grid at {offset_x} {offset_y}",
-        pixels.width(),
-        pixels.height()
-    );
-    for inner_y in 0..pixels.height() {
-        for inner_x in 0..pixels.width() {
-            let is_set = pixels.get(inner_x, inner_y);
-            let x = offset_x + inner_x;
-            let y = offset_y + inner_y;
+    fn print_pixel_grid(
+        &self,
+        offset_x: usize,
+        offset_y: usize,
+        pixels: &Bitmap,
+    ) -> ExecutionResult {
+        debug!(
+            "printing {}x{} grid at {offset_x} {offset_y}",
+            pixels.width(),
+            pixels.height()
+        );
+        let mut display = self.display.write().unwrap();
+        for inner_y in 0..pixels.height() {
+            for inner_x in 0..pixels.width() {
+                let is_set = pixels.get(inner_x, inner_y);
+                let x = offset_x + inner_x;
+                let y = offset_y + inner_y;
 
-            if x >= display.width() || y >= display.height() {
-                error!("stopping pixel grid draw because coordinate {x} {y} is out of bounds");
-                return false;
+                if x >= display.width() || y >= display.height() {
+                    error!("stopping pixel grid draw because coordinate {x} {y} is out of bounds");
+                    return Failure;
+                }
+
+                display.set(x, y, is_set);
             }
-
-            display.set(x, y, is_set);
         }
+
+        Success
     }
 
-    true
-}
-
-fn get_coordinates_for_index(offset: usize, index: usize) -> (usize, usize) {
-    let pixel_index = offset + index;
-    (pixel_index % PIXEL_WIDTH, pixel_index / PIXEL_WIDTH)
+    fn get_coordinates_for_index(
+        offset: usize,
+        index: usize,
+    ) -> (usize, usize) {
+        let pixel_index = offset + index;
+        (pixel_index % PIXEL_WIDTH, pixel_index / PIXEL_WIDTH)
+    }
 }

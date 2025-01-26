@@ -1,4 +1,5 @@
 use servicepoint::{Bitmap, DataRef, TILE_SIZE};
+use std::ops::Index;
 
 const CHAR_COUNT: usize = u8::MAX as usize + 1;
 
@@ -10,15 +11,29 @@ impl Cp437Font {
     pub fn new(bitmaps: [Bitmap; CHAR_COUNT]) -> Self {
         Self { bitmaps }
     }
-
-    pub fn get_bitmap(&self, char_code: u8) -> &Bitmap {
-        &self.bitmaps[char_code as usize]
-    }
 }
 
 impl Default for Cp437Font {
     fn default() -> Self {
-        load_static()
+        let mut bitmaps =
+            core::array::from_fn(|_| Bitmap::new(TILE_SIZE, TILE_SIZE));
+
+        for (char_code, bitmap) in bitmaps.iter_mut().enumerate() {
+            let bits = CP437_FONT_LINEAR[char_code];
+            let mut bytes = bits.to_be_bytes();
+            bytes.reverse();
+            bitmap.data_ref_mut().copy_from_slice(bytes.as_slice());
+        }
+
+        Self::new(bitmaps)
+    }
+}
+
+impl Index<u8> for Cp437Font {
+    type Output = Bitmap;
+
+    fn index(&self, char_code: u8) -> &Self::Output {
+        &self.bitmaps[char_code as usize]
     }
 }
 
@@ -281,17 +296,3 @@ pub(crate) const CP437_FONT_LINEAR: [u64; 256] = [
     0x00007c7c7c7c7c00, // 0xfe
     0x0000000000000000, // 0xff
 ];
-
-fn load_static() -> Cp437Font {
-    let mut bitmaps =
-        core::array::from_fn(|_| Bitmap::new(TILE_SIZE, TILE_SIZE));
-
-    for (char_code, bitmap) in bitmaps.iter_mut().enumerate() {
-        let bits = CP437_FONT_LINEAR[char_code];
-        let mut bytes = bits.to_be_bytes();
-        bytes.reverse();
-        bitmap.data_ref_mut().copy_from_slice(bytes.as_slice());
-    }
-
-    Cp437Font::new(bitmaps)
-}
