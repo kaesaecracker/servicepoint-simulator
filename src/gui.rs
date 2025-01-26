@@ -12,14 +12,14 @@ use winit::event_loop::ActiveEventLoop;
 use winit::keyboard::KeyCode::KeyC;
 use winit::window::{Window, WindowId};
 
-use crate::Cli;
+use crate::cli::{GuiOptions};
 
 pub struct Gui<'t> {
     display: &'t RwLock<Bitmap>,
     luma: &'t RwLock<BrightnessGrid>,
     window: Option<Window>,
     stop_udp_tx: Sender<()>,
-    cli: &'t Cli,
+    options: GuiOptions,
     logical_size: LogicalSize<u16>,
 }
 
@@ -41,15 +41,15 @@ impl<'t> Gui<'t> {
         display: &'t RwLock<Bitmap>,
         luma: &'t RwLock<BrightnessGrid>,
         stop_udp_tx: Sender<()>,
-        cli: &'t Cli,
+        options: GuiOptions,
     ) -> Self {
         Gui {
+            window: None,
+            logical_size: Self::get_logical_size(options.spacers),
             display,
             luma,
             stop_udp_tx,
-            cli,
-            window: None,
-            logical_size: Self::get_logical_size(cli.spacers),
+            options,
         }
     }
 
@@ -79,7 +79,7 @@ impl<'t> Gui<'t> {
         let brightness_scale = (u8::MAX as f32) / (u8::from(Brightness::MAX) as f32);
 
         for tile_y in 0..TILE_HEIGHT {
-            if self.cli.spacers && tile_y != 0 {
+            if self.options.spacers && tile_y != 0 {
                 // cannot just frame.skip(PIXEL_WIDTH as usize * SPACER_HEIGHT as usize) because of typing
                 for _ in 0..PIXEL_WIDTH * SPACER_HEIGHT {
                     frame.next().unwrap();
@@ -105,9 +105,9 @@ impl<'t> Gui<'t> {
 
     fn get_on_color(&self, brightness: u8) -> [u8; 4] {
         [
-            if self.cli.red { brightness } else { 0u8 },
-            if self.cli.green { brightness } else { 0u8 },
-            if self.cli.blue { brightness } else { 0u8 },
+            if self.options.red { brightness } else { 0u8 },
+            if self.options.green { brightness } else { 0u8 },
+            if self.options.blue { brightness } else { 0u8 },
             255,
         ]
     }

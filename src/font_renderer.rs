@@ -43,18 +43,28 @@ pub enum RenderError {
 }
 
 impl FontRenderer8x8 {
-    pub fn new(font: Font, fallback_char: Option<char>) -> Self {
+    const FALLBACK_CHAR: char = '?';
+    pub fn new(font: Font) -> Self {
         let canvas =
             Canvas::new(vec2i(TILE_SIZE as i32, TILE_SIZE as i32), Format::A8);
         assert_eq!(canvas.pixels.len(), TILE_SIZE * TILE_SIZE);
         assert_eq!(canvas.stride, TILE_SIZE);
-        let fallback_char = fallback_char.and_then(|c| font.glyph_for_char(c));
+        let fallback_char = font.glyph_for_char(Self::FALLBACK_CHAR);
         let result = Self {
             font: SendFont(font),
             fallback_char,
             canvas: Mutex::new(canvas),
         };
         result
+    }
+
+    pub fn from_name(family_name: String) -> Self {
+        let font = SystemSource::new()
+            .select_best_match(&[FamilyName::Title(family_name)], &Properties::new())
+            .unwrap()
+            .load()
+            .unwrap();
+        Self::new(font)
     }
 
     pub fn render(
@@ -104,17 +114,10 @@ impl FontRenderer8x8 {
 impl Default for FontRenderer8x8 {
     fn default() -> Self {
         let utf8_font = SystemSource::new()
-            .select_best_match(
-                &[
-                    FamilyName::Title("Roboto Mono".to_string()),
-                    FamilyName::Title("Fira Mono".to_string()),
-                    FamilyName::Monospace,
-                ],
-                &Properties::new(),
-            )
+            .select_best_match(&[FamilyName::Monospace], &Properties::new())
             .unwrap()
             .load()
             .unwrap();
-        FontRenderer8x8::new(utf8_font, Some('?'))
+        FontRenderer8x8::new(utf8_font)
     }
 }

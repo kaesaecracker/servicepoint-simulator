@@ -1,5 +1,5 @@
 use crate::execute_command::ExecutionResult::{Failure, Shutdown, Success};
-use crate::font::Cp437Font;
+use crate::cp437_font::Cp437Font;
 use crate::font_renderer::FontRenderer8x8;
 use log::{debug, error, info, trace, warn};
 use servicepoint::{
@@ -13,7 +13,7 @@ pub struct CommandExecutor<'t> {
     display: &'t RwLock<Bitmap>,
     luma: &'t RwLock<BrightnessGrid>,
     cp437_font: Cp437Font,
-    utf8_font: FontRenderer8x8,
+    font_renderer: FontRenderer8x8,
 }
 
 #[must_use]
@@ -27,11 +27,12 @@ impl<'t> CommandExecutor<'t> {
     pub fn new(
         display: &'t RwLock<Bitmap>,
         luma: &'t RwLock<BrightnessGrid>,
+        font_renderer: FontRenderer8x8,
     ) -> Self {
         CommandExecutor {
             display,
             luma,
-            utf8_font: FontRenderer8x8::default(),
+            font_renderer,
             cp437_font: Cp437Font::default(),
         }
     }
@@ -190,7 +191,7 @@ impl<'t> CommandExecutor<'t> {
                 let tile_x = char_x + x;
                 let tile_y = char_y + y;
 
-                if let Err(e) = self.utf8_font.render(
+                if let Err(e) = self.font_renderer.render(
                     char,
                     &mut display,
                     Origin::new(tile_x * TILE_SIZE, tile_y * TILE_SIZE),

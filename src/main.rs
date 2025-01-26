@@ -11,89 +11,37 @@ use std::io::ErrorKind;
 use std::net::UdpSocket;
 use std::sync::{mpsc, RwLock};
 use std::time::Duration;
-use winit::event_loop::{ControlFlow, EventLoop};
+use winit::event_loop::{ControlFlow, EventLoop, EventLoopProxy};
+use cli::Cli;
+use crate::font_renderer::FontRenderer8x8;
 
 mod execute_command;
-mod font;
+mod cp437_font;
 mod font_renderer;
 mod gui;
-
-#[derive(Parser, Debug)]
-struct Cli {
-    #[arg(
-        long,
-        default_value = "0.0.0.0:2342",
-        help = "address and port to bind to"
-    )]
-    bind: String,
-    #[arg(
-        short,
-        long,
-        default_value_t = false,
-        help = "add spacers between tile rows to simulate gaps in real display"
-    )]
-    spacers: bool,
-    #[arg(
-        short,
-        long,
-        help = "Set default log level lower. You can also change this via the RUST_LOG environment variable."
-    )]
-    debug: bool,
-    #[arg(
-        short,
-        long,
-        default_value_t = false,
-        help = "Use the red color channel"
-    )]
-    red: bool,
-    #[arg(
-        short,
-        long,
-        default_value_t = false,
-        help = "Use the green color channel"
-    )]
-    green: bool,
-    #[arg(
-        short,
-        long,
-        default_value_t = false,
-        help = "Use the blue color channel"
-    )]
-    blue: bool,
-}
+mod cli;
 
 const BUF_SIZE: usize = 8985;
 
 fn main() {
     let mut cli = Cli::parse();
-
-    env_logger::builder()
-        .filter_level(if cli.debug {
-            LevelFilter::Debug
-        } else {
-            LevelFilter::Info
-        })
-        .parse_default_env()
-        .init();
-
-    if !(cli.red || cli.blue || cli.green) {
-        cli.green = true;
+    if !(cli.gui.red || cli.gui.blue || cli.gui.green) {
+        cli.gui.green = true;
     }
 
+    init_logging(cli.debug);
     info!("starting with args: {:?}", &cli);
+
     let socket = UdpSocket::bind(&cli.bind).expect("could not bind socket");
     socket
         .set_nonblocking(true)
         .expect("could not enter non blocking mode");
 
     let display = RwLock::new(Bitmap::new(PIXEL_WIDTH, PIXEL_HEIGHT));
-
-    let mut luma = BrightnessGrid::new(TILE_WIDTH, TILE_HEIGHT);
-    luma.fill(Brightness::MAX);
-    let luma = RwLock::new(luma);
+    let luma = RwLock::new(BrightnessGrid::new(TILE_WIDTH, TILE_HEIGHT));
 
     let (stop_udp_tx, stop_udp_rx) = mpsc::channel();
-    let mut app = Gui::new(&display, &luma, stop_udp_tx, &cli);
+    let mut gui = Gui::new(&display, &luma, stop_udp_tx, cli.gui);
 
     let event_loop = EventLoop::with_user_event()
         .build()
@@ -101,7 +49,9 @@ fn main() {
     event_loop.set_control_flow(ControlFlow::Wait);
 
     let event_proxy = event_loop.create_proxy();
-    let command_executor = CommandExecutor::new(&display, &luma);
+    let font_renderer = cli.font.map(move |font| FontRenderer8x8::from_name(font))
+        .unwrap_or_else(move || FontRenderer8x8::default());
+    let command_executor = CommandExecutor::new(&display, &luma, font_renderer);
 
     std::thread::scope(move |scope| {
         scope.spawn(move || {
@@ -117,27 +67,43 @@ fn main() {
                     None => continue,
                 };
 
-                match command_executor.execute(command) {
-                    ExecutionResult::Success => {
-                        event_proxy
-                            .send_event(AppEvents::UdpPacketHandled)
-                            .expect("could not send packet handled event");
-                    }
-                    ExecutionResult::Failure => {
-                        error!("failed to execute command");
-                    }
-                    ExecutionResult::Shutdown => {
-                        event_proxy
-                            .send_event(AppEvents::UdpThreadClosed)
-                            .expect("could not send close event");
-                    }
-                }
+                handle_command(&event_proxy, &command_executor, command);
             }
         });
         event_loop
-            .run_app(&mut app)
+            .run_app(&mut gui)
             .expect("could not run event loop");
     });
+}
+
+fn handle_command(event_proxy: &EventLoopProxy<AppEvents>, command_executor: &CommandExecutor, command: Command) {
+    match command_executor.execute(command) {
+        ExecutionResult::Success => {
+            event_proxy
+                .send_event(AppEvents::UdpPacketHandled)
+                .expect("could not send packet handled event");
+        }
+        ExecutionResult::Failure => {
+            error!("failed to execute command");
+        }
+        ExecutionResult::Shutdown => {
+            event_proxy
+                .send_event(AppEvents::UdpThreadClosed)
+                .expect("could not send close event");
+        }
+    }
+}
+
+fn init_logging(debug: bool) {
+    let filter = if debug {
+        LevelFilter::Debug
+    } else {
+        LevelFilter::Info
+    };
+    env_logger::builder()
+        .filter_level(filter)
+        .parse_default_env()
+        .init();
 }
 
 fn command_from_slice(slice: &[u8]) -> Option<Command> {
