@@ -1,3 +1,4 @@
+use std::ops::Index;
 use servicepoint::{Bitmap, DataRef, TILE_SIZE};
 
 const CHAR_COUNT: usize = u8::MAX as usize + 1;
@@ -9,10 +10,6 @@ pub struct Cp437Font {
 impl Cp437Font {
     pub fn new(bitmaps: [Bitmap; CHAR_COUNT]) -> Self {
         Self { bitmaps }
-    }
-
-    pub fn get_bitmap(&self, char_code: u8) -> &Bitmap {
-        &self.bitmaps[char_code as usize]
     }
 }
 
@@ -29,6 +26,14 @@ impl Default for Cp437Font {
         }
 
         Self::new(bitmaps)
+    }
+}
+
+impl Index<u8> for Cp437Font {
+    type Output = Bitmap;
+
+    fn index(&self, char_code: u8) -> &Self::Output {
+        &self.bitmaps[char_code as usize]
     }
 }
 

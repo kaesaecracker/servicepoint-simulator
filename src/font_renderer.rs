@@ -78,11 +78,8 @@ impl FontRenderer8x8 {
             .font
             .as_ref()
             .glyph_for_char(char)
-            .or(self.fallback_char);
-        let glyph_id = match glyph_id {
-            None => return Err(GlyphNotFound(char)),
-            Some(val) => val,
-        };
+            .or(self.fallback_char)
+            .ok_or_else(|| GlyphNotFound(char))?;
 
         canvas.pixels.fill(0);
         self.font.as_ref().rasterize_glyph(
@@ -97,8 +94,7 @@ impl FontRenderer8x8 {
 
         for y in 0..TILE_SIZE {
             for x in 0..TILE_SIZE {
-                let index = x + y * TILE_SIZE;
-                let canvas_val = canvas.pixels[index] != 0;
+                let canvas_val = canvas.pixels[x + y * TILE_SIZE] != 0;
                 let bitmap_x = (offset.x + x) as isize;
                 let bitmap_y = (offset.y + y) as isize;
                 if !bitmap.set_optional(bitmap_x, bitmap_y, canvas_val) {

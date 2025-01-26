@@ -57,17 +57,9 @@ fn main() {
         scope.spawn(move || {
             let mut buf = [0; BUF_SIZE];
             while stop_udp_rx.try_recv().is_err() {
-                let amount = match receive_into_buf(&socket, &mut buf) {
-                    Some(value) => value,
-                    None => continue,
-                };
-
-                let command = match command_from_slice(&buf[..amount]) {
-                    Some(value) => value,
-                    None => continue,
-                };
-
-                handle_command(&event_proxy, &command_executor, command);
+                receive_into_buf(&socket, &mut buf)
+                    .and_then(move |amount| command_from_slice(&buf[..amount]))
+                    .map(|cmd| handle_command(&event_proxy, &command_executor, cmd));
             }
         });
         event_loop
@@ -107,22 +99,12 @@ fn init_logging(debug: bool) {
 }
 
 fn command_from_slice(slice: &[u8]) -> Option<Command> {
-    let package = match servicepoint::Packet::try_from(slice) {
-        Err(_) => {
-            warn!("could not load packet with length {}", slice.len());
-            return None;
-        }
-        Ok(package) => package,
-    };
-
-    let command = match Command::try_from(package) {
-        Err(err) => {
-            warn!("could not read command for packet: {:?}", err);
-            return None;
-        }
-        Ok(val) => val,
-    };
-    Some(command)
+    let packet = servicepoint::Packet::try_from(slice)
+        .inspect_err(|_| warn!("could not load packet with length {}", slice.len()))
+        .ok()?;
+    Command::try_from(packet)
+        .inspect_err(move |err| warn!("could not read command for packet: {:?}", err))
+        .ok()
 }
 
 fn receive_into_buf(

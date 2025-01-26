@@ -154,11 +154,10 @@ impl<'t> CommandExecutor<'t> {
                 let tile_x = char_x + x;
                 let tile_y = char_y + y;
 
-                let bitmap = font.get_bitmap(char_code);
                 match self.print_pixel_grid(
                     tile_x * TILE_SIZE,
                     tile_y * TILE_SIZE,
-                    bitmap,
+                    &font[char_code],
                 ) {
                     Success => {}
                     Failure => {
