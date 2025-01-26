@@ -1,10 +1,12 @@
 #![deny(clippy::all)]
 
+use crate::font_renderer::FontRenderer8x8;
 use crate::{
     execute_command::{CommandExecutor, ExecutionResult},
     gui::{AppEvents, Gui},
 };
 use clap::Parser;
+use cli::Cli;
 use log::{error, info, warn, LevelFilter};
 use servicepoint::*;
 use std::io::ErrorKind;
@@ -12,14 +14,12 @@ use std::net::UdpSocket;
 use std::sync::{mpsc, RwLock};
 use std::time::Duration;
 use winit::event_loop::{ControlFlow, EventLoop, EventLoopProxy};
-use cli::Cli;
-use crate::font_renderer::FontRenderer8x8;
 
-mod execute_command;
+mod cli;
 mod cp437_font;
+mod execute_command;
 mod font_renderer;
 mod gui;
-mod cli;
 
 const BUF_SIZE: usize = 8985;
 
@@ -49,7 +49,9 @@ fn main() {
     event_loop.set_control_flow(ControlFlow::Wait);
 
     let event_proxy = event_loop.create_proxy();
-    let font_renderer = cli.font.map(move |font| FontRenderer8x8::from_name(font))
+    let font_renderer = cli
+        .font
+        .map(move |font| FontRenderer8x8::from_name(font))
         .unwrap_or_else(move || FontRenderer8x8::default());
     let command_executor = CommandExecutor::new(&display, &luma, font_renderer);
 
@@ -59,7 +61,9 @@ fn main() {
             while stop_udp_rx.try_recv().is_err() {
                 receive_into_buf(&socket, &mut buf)
                     .and_then(move |amount| command_from_slice(&buf[..amount]))
-                    .map(|cmd| handle_command(&event_proxy, &command_executor, cmd));
+                    .map(|cmd| {
+                        handle_command(&event_proxy, &command_executor, cmd)
+                    });
             }
         });
         event_loop
@@ -68,7 +72,11 @@ fn main() {
     });
 }
 
-fn handle_command(event_proxy: &EventLoopProxy<AppEvents>, command_executor: &CommandExecutor, command: Command) {
+fn handle_command(
+    event_proxy: &EventLoopProxy<AppEvents>,
+    command_executor: &CommandExecutor,
+    command: Command,
+) {
     match command_executor.execute(command) {
         ExecutionResult::Success => {
             event_proxy
@@ -100,10 +108,14 @@ fn init_logging(debug: bool) {
 
 fn command_from_slice(slice: &[u8]) -> Option<Command> {
     let packet = servicepoint::Packet::try_from(slice)
-        .inspect_err(|_| warn!("could not load packet with length {}", slice.len()))
+        .inspect_err(|_| {
+            warn!("could not load packet with length {}", slice.len())
+        })
         .ok()?;
     Command::try_from(packet)
-        .inspect_err(move |err| warn!("could not read command for packet: {:?}", err))
+        .inspect_err(move |err| {
+            warn!("could not read command for packet: {:?}", err)
+        })
         .ok()
 }
 

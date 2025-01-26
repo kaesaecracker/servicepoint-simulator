@@ -1,5 +1,5 @@
-use std::ops::Index;
 use servicepoint::{Bitmap, DataRef, TILE_SIZE};
+use std::ops::Index;
 
 const CHAR_COUNT: usize = u8::MAX as usize + 1;
 

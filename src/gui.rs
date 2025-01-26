@@ -12,7 +12,7 @@ use winit::event_loop::ActiveEventLoop;
 use winit::keyboard::KeyCode::KeyC;
 use winit::window::{Window, WindowId};
 
-use crate::cli::{GuiOptions};
+use crate::cli::GuiOptions;
 
 pub struct Gui<'t> {
     display: &'t RwLock<Bitmap>,
@@ -76,7 +76,8 @@ impl<'t> Gui<'t> {
     fn draw_frame(&self, frame: &mut ChunksExactMut<u8>) {
         let display = self.display.read().unwrap();
         let luma = self.luma.read().unwrap();
-        let brightness_scale = (u8::MAX as f32) / (u8::from(Brightness::MAX) as f32);
+        let brightness_scale =
+            (u8::MAX as f32) / (u8::from(Brightness::MAX) as f32);
 
         for tile_y in 0..TILE_HEIGHT {
             if self.options.spacers && tile_y != 0 {
@@ -90,11 +91,16 @@ impl<'t> Gui<'t> {
             for y in start_y..start_y + TILE_SIZE {
                 for tile_x in 0..TILE_WIDTH {
                     let brightness = u8::from(luma.get(tile_x, tile_y));
-                    let brightness = (brightness_scale * brightness as f32) as u8;
+                    let brightness =
+                        (brightness_scale * brightness as f32) as u8;
                     let on_color = self.get_on_color(brightness);
                     let start_x = tile_x * TILE_SIZE;
                     for x in start_x..start_x + TILE_SIZE {
-                        let color = if display.get(x, y) { on_color } else { OFF_COLOR };
+                        let color = if display.get(x, y) {
+                            on_color
+                        } else {
+                            OFF_COLOR
+                        };
                         let pixel = frame.next().unwrap();
                         pixel.copy_from_slice(&color);
                     }

@@ -1,5 +1,5 @@
-use crate::execute_command::ExecutionResult::{Failure, Shutdown, Success};
 use crate::cp437_font::Cp437Font;
+use crate::execute_command::ExecutionResult::{Failure, Shutdown, Success};
 use crate::font_renderer::FontRenderer8x8;
 use log::{debug, error, info, trace, warn};
 use servicepoint::{

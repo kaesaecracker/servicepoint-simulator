@@ -60,7 +60,10 @@ impl FontRenderer8x8 {
 
     pub fn from_name(family_name: String) -> Self {
         let font = SystemSource::new()
-            .select_best_match(&[FamilyName::Title(family_name)], &Properties::new())
+            .select_best_match(
+                &[FamilyName::Title(family_name)],
+                &Properties::new(),
+            )
             .unwrap()
             .load()
             .unwrap();
