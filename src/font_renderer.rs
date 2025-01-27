@@ -15,6 +15,7 @@ use pathfinder_geometry::{
 use servicepoint::{Bitmap, Grid, Origin, Pixels, TILE_SIZE};
 use std::sync::{Mutex, MutexGuard};
 
+#[derive(Debug)]
 struct SendFont(Font);
 
 // struct is only using primitives and pointers - lets try if it is only missing the declaration
@@ -26,6 +27,7 @@ impl AsRef<Font> for SendFont {
     }
 }
 
+#[derive(Debug)]
 pub struct FontRenderer8x8 {
     font: SendFont,
     canvas: Mutex<Canvas>,

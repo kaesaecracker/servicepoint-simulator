@@ -3,6 +3,7 @@ use std::ops::Index;
 
 const CHAR_COUNT: usize = u8::MAX as usize + 1;
 
+#[derive(Debug)]
 pub struct Cp437Font {
     bitmaps: [Bitmap; CHAR_COUNT],
 }
