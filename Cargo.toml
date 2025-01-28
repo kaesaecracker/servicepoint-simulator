@@ -10,19 +10,17 @@ license = "GPL-3.0-or-later"
 log = "0.4"
 env_logger = "0.11"
 clap = { version = "4.5", features = ["derive"] }
-# for drawing pixels onto the surface of the window
-pixels = "0.15"
-# I should not need this as a direct dependency, but then I cannot spell the types needed to use font-kit...
-pathfinder_geometry = "0.5.1"
-font-kit = "0.14.2"
 thiserror = "2.0"
 
-[dependencies.servicepoint]
-version = "0.13.0"
-features = ["all_compressions"]
+# package parsing
+servicepoint = { version = "0.13.0", features = ["all_compressions"] }
 
-[dependencies.winit]
-version = "0.30"
-features = ["rwh_05"]
-default-features = true
+# font rendering
+font-kit = "0.14.2"
+# I should not need this as a direct dependency, but then I cannot spell the types needed to use font-kit...
+pathfinder_geometry = "0.5.1"
 
+# for opening a window
+winit = "0.30.8"
+# for drawing pixels onto the surface of the window
+softbuffer = "0.4.6"

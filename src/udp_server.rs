@@ -42,11 +42,11 @@ impl<'t> UdpServer<'t> {
 
     pub(crate) fn run(&mut self) {
         while self.stop_rx.try_recv().is_err() {
-            self.receive_into_buf()
-                .and_then(|amount| {
-                    Self::command_from_slice(&self.buf[..amount])
-                })
-                .map(|cmd| self.handle_command(cmd));
+            if let Some(cmd) = self.receive_into_buf().and_then(|amount| {
+                Self::command_from_slice(&self.buf[..amount])
+            }) {
+                self.handle_command(cmd);
+            }
         }
     }
 

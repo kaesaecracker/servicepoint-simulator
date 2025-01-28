@@ -1,26 +1,22 @@
-use std::slice::ChunksExactMut;
-use std::sync::mpsc::Sender;
-use std::sync::RwLock;
+use std::{sync::mpsc::Sender, sync::RwLock};
 
 use log::{info, warn};
-use pixels::{Pixels, SurfaceTexture};
 use servicepoint::*;
-use winit::application::ApplicationHandler;
-use winit::dpi::LogicalSize;
-use winit::event::WindowEvent;
-use winit::event_loop::ActiveEventLoop;
-use winit::keyboard::KeyCode::KeyC;
-use winit::window::{Window, WindowId};
+use winit::{
+    application::ApplicationHandler, dpi::LogicalSize, event::WindowEvent,
+    event_loop::ActiveEventLoop, keyboard::KeyCode::KeyC, window::WindowId,
+};
 
 use crate::cli::GuiOptions;
+use crate::gui_window::GuiWindow;
 
 pub struct Gui<'t> {
     display: &'t RwLock<Bitmap>,
     luma: &'t RwLock<BrightnessGrid>,
-    window: Option<Window>,
     stop_udp_tx: Sender<()>,
     options: GuiOptions,
     logical_size: LogicalSize<u16>,
+    window: Option<GuiWindow>,
 }
 
 const SPACER_HEIGHT: usize = 4;
@@ -28,7 +24,7 @@ const NUM_SPACERS: usize = (PIXEL_HEIGHT / TILE_SIZE) - 1;
 const PIXEL_HEIGHT_WITH_SPACERS: usize =
     PIXEL_HEIGHT + NUM_SPACERS * SPACER_HEIGHT;
 
-const OFF_COLOR: [u8; 4] = [0u8, 0, 0, 255];
+const OFF_COLOR: u32 = u32::from_ne_bytes([0u8, 0, 0, 0]);
 
 #[derive(Debug)]
 pub enum AppEvents {
@@ -43,7 +39,7 @@ impl<'t> Gui<'t> {
         stop_udp_tx: Sender<()>,
         options: GuiOptions,
     ) -> Self {
-        Gui {
+        Self {
             window: None,
             logical_size: Self::get_logical_size(options.spacers),
             display,
@@ -54,30 +50,13 @@ impl<'t> Gui<'t> {
     }
 
     fn draw(&mut self) {
-        let window = self.window.as_ref().unwrap();
-        let window_size = window.inner_size();
-        let surface_texture =
-            SurfaceTexture::new(window_size.width, window_size.height, &window);
-
-        // TODO: fix pixels: creating a new instance per draw crashes after some time on macOS,
-        // but keeping one instance for the lifetime of the Gui SIGSEGVs on Wayland when entering a background state.
-        let mut pixels = Pixels::new(
-            self.logical_size.width as u32,
-            self.logical_size.height as u32,
-            surface_texture,
-        )
-        .unwrap();
-
-        let mut frame = pixels.frame_mut().chunks_exact_mut(4);
-        self.draw_frame(&mut frame);
-        pixels.render().expect("could not render");
-    }
-
-    fn draw_frame(&self, frame: &mut ChunksExactMut<u8>) {
         let display = self.display.read().unwrap();
         let luma = self.luma.read().unwrap();
         let brightness_scale =
             (u8::MAX as f32) / (u8::from(Brightness::MAX) as f32);
+
+        let mut buffer = self.window.as_mut().unwrap().get_buffer();
+        let mut frame = buffer.iter_mut();
 
         for tile_y in 0..TILE_HEIGHT {
             if self.options.spacers && tile_y != 0 {
@@ -93,7 +72,8 @@ impl<'t> Gui<'t> {
                     let brightness = u8::from(luma.get(tile_x, tile_y));
                     let brightness =
                         (brightness_scale * brightness as f32) as u8;
-                    let on_color = self.get_on_color(brightness);
+                    let on_color =
+                        Self::get_on_color(&self.options, brightness);
                     let start_x = tile_x * TILE_SIZE;
                     for x in start_x..start_x + TILE_SIZE {
                         let color = if display.get(x, y) {
@@ -101,21 +81,22 @@ impl<'t> Gui<'t> {
                         } else {
                             OFF_COLOR
                         };
-                        let pixel = frame.next().unwrap();
-                        pixel.copy_from_slice(&color);
+                        *frame.next().unwrap() = color;
                     }
                 }
             }
         }
+
+        buffer.present().unwrap();
     }
 
-    fn get_on_color(&self, brightness: u8) -> [u8; 4] {
-        [
-            if self.options.red { brightness } else { 0u8 },
-            if self.options.green { brightness } else { 0u8 },
-            if self.options.blue { brightness } else { 0u8 },
-            255,
-        ]
+    fn get_on_color(options: &GuiOptions, brightness: u8) -> u32 {
+        u32::from_ne_bytes([
+            if options.blue { brightness } else { 0u8 },
+            if options.green { brightness } else { 0u8 },
+            if options.red { brightness } else { 0u8 },
+            0,
+        ])
     }
 
     fn get_logical_size(spacers: bool) -> LogicalSize<u16> {
@@ -128,15 +109,9 @@ impl<'t> Gui<'t> {
     }
 }
 
-impl ApplicationHandler<AppEvents> for Gui<'_> {
+impl<'t> ApplicationHandler<AppEvents> for Gui<'t> {
     fn resumed(&mut self, event_loop: &ActiveEventLoop) {
-        let attributes = Window::default_attributes()
-            .with_title("servicepoint-simulator")
-            .with_inner_size(self.logical_size)
-            .with_transparent(false);
-
-        let window = event_loop.create_window(attributes).unwrap();
-        self.window = Some(window);
+        self.window = Some(GuiWindow::new(event_loop, self.logical_size));
     }
 
     fn user_event(&mut self, event_loop: &ActiveEventLoop, event: AppEvents) {
@@ -162,7 +137,6 @@ impl ApplicationHandler<AppEvents> for Gui<'_> {
         match event {
             WindowEvent::CloseRequested => {
                 warn!("window event close requested");
-                self.window = None;
                 let _ = self.stop_udp_tx.send(()); // try to stop udp thread
                 event_loop.exit();
             }
@@ -178,5 +152,9 @@ impl ApplicationHandler<AppEvents> for Gui<'_> {
             }
             _ => {}
         }
+    }
+
+    fn suspended(&mut self, _: &ActiveEventLoop) {
+        self.window = None;
     }
 }

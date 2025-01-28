@@ -15,6 +15,7 @@ mod command_executor;
 mod cp437_font;
 mod font_renderer;
 mod gui;
+mod gui_window;
 mod udp_server;
 
 fn main() {
@@ -36,8 +37,8 @@ fn main() {
     let (stop_udp_tx, stop_udp_rx) = mpsc::channel();
     let font_renderer = cli
         .font
-        .map(move |font| FontRenderer8x8::from_name(font))
-        .unwrap_or_else(move || FontRenderer8x8::default());
+        .map(FontRenderer8x8::from_name)
+        .unwrap_or_else(FontRenderer8x8::default);
     let command_executor = CommandExecutor::new(&display, &luma, font_renderer);
     let mut udp_server = UdpServer::new(
         cli.bind,
