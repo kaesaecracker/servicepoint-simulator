@@ -45,7 +45,22 @@ impl<'t> UdpServer<'t> {
             if let Some(cmd) = self.receive_into_buf().and_then(|amount| {
                 Self::command_from_slice(&self.buf[..amount])
             }) {
-                self.handle_command(cmd);
+                match self.command_executor.execute(cmd) {
+                    ExecutionResult::Success => {
+                        self.app_events
+                            .send_event(AppEvents::UdpPacketHandled)
+                            .expect("could not send packet handled event");
+                    }
+                    ExecutionResult::Failure => {
+                        error!("failed to execute command");
+                    }
+                    ExecutionResult::Shutdown => {
+                        self.app_events
+                            .send_event(AppEvents::UdpThreadClosed)
+                            .expect("could not send close event");
+                        break;
+                    }
+                }
             }
         }
     }
@@ -80,23 +95,5 @@ impl<'t> UdpServer<'t> {
             );
         }
         Some(amount)
-    }
-
-    fn handle_command(&mut self, command: Command) {
-        match self.command_executor.execute(command) {
-            ExecutionResult::Success => {
-                self.app_events
-                    .send_event(AppEvents::UdpPacketHandled)
-                    .expect("could not send packet handled event");
-            }
-            ExecutionResult::Failure => {
-                error!("failed to execute command");
-            }
-            ExecutionResult::Shutdown => {
-                self.app_events
-                    .send_event(AppEvents::UdpThreadClosed)
-                    .expect("could not send close event");
-            }
-        }
     }
 }
