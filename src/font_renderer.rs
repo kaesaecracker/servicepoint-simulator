@@ -15,6 +15,7 @@ use pathfinder_geometry::{
 use servicepoint::{Bitmap, Grid, Origin, Pixels, TILE_SIZE};
 use std::sync::{Mutex, MutexGuard};
 
+#[derive(Debug)]
 struct SendFont(Font);
 
 // struct is only using primitives and pointers - lets try if it is only missing the declaration
@@ -26,6 +27,7 @@ impl AsRef<Font> for SendFont {
     }
 }
 
+#[derive(Debug)]
 pub struct FontRenderer8x8 {
     font: SendFont,
     canvas: Mutex<Canvas>,
@@ -50,12 +52,11 @@ impl FontRenderer8x8 {
         assert_eq!(canvas.pixels.len(), TILE_SIZE * TILE_SIZE);
         assert_eq!(canvas.stride, TILE_SIZE);
         let fallback_char = font.glyph_for_char(Self::FALLBACK_CHAR);
-        let result = Self {
+        Self {
             font: SendFont(font),
             fallback_char,
             canvas: Mutex::new(canvas),
-        };
-        result
+        }
     }
 
     pub fn from_name(family_name: String) -> Self {
@@ -116,7 +117,7 @@ impl FontRenderer8x8 {
             .as_ref()
             .glyph_for_char(char)
             .or(self.fallback_char)
-            .ok_or_else(|| GlyphNotFound(char))
+            .ok_or(GlyphNotFound(char))
     }
 }
 
