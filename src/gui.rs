@@ -109,7 +109,7 @@ impl<'t> Gui<'t> {
     }
 }
 
-impl<'t> ApplicationHandler<AppEvents> for Gui<'t> {
+impl ApplicationHandler<AppEvents> for Gui<'_> {
     fn resumed(&mut self, event_loop: &ActiveEventLoop) {
         self.window = Some(GuiWindow::new(event_loop, self.logical_size));
     }
