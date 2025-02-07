@@ -24,7 +24,7 @@ jobs:
       - name: Update repos
         run: sudo apt-get update -qq
       - name: Install rust toolchain
-        run: sudo apt-get install -qy cargo rust-clippy
+        run: sudo apt-get install -qy cargo-1.80 rust-1.80-clippy
       - name: Install system dependencies
         run: sudo apt-get install -qy liblzma-dev libfontconfig1-dev
 
