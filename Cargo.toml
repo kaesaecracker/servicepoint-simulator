@@ -22,6 +22,6 @@ font-kit = "0.14.2"
 pathfinder_geometry = "0.5.1"
 
 # for opening a window
-winit = "0.30.8"
+winit = "0.30"
 # for drawing pixels onto the surface of the window
 softbuffer = "0.4.6"
