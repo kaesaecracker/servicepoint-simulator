@@ -1,14 +1,16 @@
 # servicepoint-simulator
 
-An emulator for the CCCB airport display. 
+A simulator for the CCCB airport display.
 
 ![example render](example_render.png)
 
-In CCCB, there is a big LED matrix screen you can send images to via UDP. 
-This project aims to build a working an application that can receive packages in the same binary format and display the contents to the user.
+In CCCB, there is a big LED matrix screen you can send images to via UDP.
+This crate contains an application that can receive packages in the same binary format and display the contents to the
+user.
 
 Use cases:
-- getting error messages for invalid packages
+
+- getting error messages for invalid packages (instead of nothing happening on the display)
 - test your project when outside CCCB
 - test your project while other people are using the display
 
@@ -17,9 +19,12 @@ The screenshot above shows the output of two example projects running in paralle
 
 ## Running
 
+With cargo installed: `cargo install servicepoint-simulator`
+
 With nix flakes: `nix run github:kaesaecracker/servicepoint-simulator`
 
-Without nix: check out this repository and use `cargo run --release`.
+You can also check out this repository and use `cargo run --release`.
+Make sure to run a release build, because a debug build _way_ slower.
 
 ## Command line arguments
 
@@ -43,6 +48,13 @@ Because this program renders to an RGB pixel buffer, you can enjoy the following
 
 - enable or disable the empty space between tile rows (`./servicepoint-simulator --spacers` to enable)
 - render pixels in red, green, blue or a combination of the three (`./servicepoint-simulator -rgb` for white pixels)
+
+## Known differences
+
+- The font used for displaying UTF-8 text is your default system monospace font, rendered to 8x8 pixels
+- The brightness levels will look linear in the simulator
+- Some commands will be executed in part on the real display and then produce an error (in a console you cannot see)
+  while the simulator refuses to execute the whole command
 
 ## Contributing
 

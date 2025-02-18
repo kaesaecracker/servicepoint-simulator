@@ -1,10 +1,16 @@
 [package]
 name = "servicepoint-simulator"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
-publish = false
+publish = true
 license = "GPL-3.0-or-later"
 keywords = ["cccb", "cccb-servicepoint", "cli"]
+description = "A simulator for the Service Point display."
+homepage = "https://git.berlin.ccc.de/servicepoint/servicepoint-simulator"
+repository = "https://git.berlin.ccc.de/servicepoint/servicepoint-simulator"
+readme = "README.md"
+rust-version = "1.80.0"
+resolver = "2"
 
 [dependencies]
 # basics
