@@ -104,7 +104,7 @@ impl CommandExecute for BitVecCommand {
             BinaryOperation::Xor => BitXor::bitxor,
         };
 
-        if self.offset as usize + bitvec.len() > PIXEL_COUNT {
+        if self.offset + bitvec.len() > PIXEL_COUNT {
             error!(
                 "bitmap with offset {offset} is too big ({} bytes)",
                 bitvec.len()
