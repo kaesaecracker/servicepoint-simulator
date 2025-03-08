@@ -2,7 +2,7 @@
 
 use crate::font_renderer::FontRenderer8x8;
 use crate::udp_server::UdpServer;
-use crate::{command_executor::CommandExecutor, gui::Gui};
+use crate::{command_executor::CommandExecutionContext, gui::Gui};
 use clap::Parser;
 use cli::Cli;
 use log::{info, LevelFilter};
@@ -39,7 +39,7 @@ fn main() {
         .font
         .map(FontRenderer8x8::from_name)
         .unwrap_or_else(FontRenderer8x8::default);
-    let command_executor = CommandExecutor::new(&display, &luma, font_renderer);
+    let command_executor = CommandExecutionContext::new(&display, &luma, font_renderer);
     let mut udp_server = UdpServer::new(
         cli.bind,
         stop_udp_rx,
