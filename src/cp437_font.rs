@@ -17,7 +17,7 @@ impl Cp437Font {
 impl Default for Cp437Font {
     fn default() -> Self {
         let mut bitmaps =
-            core::array::from_fn(|_| Bitmap::new(TILE_SIZE, TILE_SIZE));
+            core::array::from_fn(|_| Bitmap::new(TILE_SIZE, TILE_SIZE).unwrap());
 
         for (char_code, bitmap) in bitmaps.iter_mut().enumerate() {
             let bits = CP437_FONT_LINEAR[char_code];

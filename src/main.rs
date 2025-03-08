@@ -32,7 +32,7 @@ fn main() {
         .expect("could not create event loop");
     event_loop.set_control_flow(ControlFlow::Wait);
 
-    let display = RwLock::new(Bitmap::new(PIXEL_WIDTH, PIXEL_HEIGHT));
+    let display = RwLock::new(Bitmap::max_sized());
     let luma = RwLock::new(BrightnessGrid::new(TILE_WIDTH, TILE_HEIGHT));
     let (stop_udp_tx, stop_udp_rx) = mpsc::channel();
     let font_renderer = cli

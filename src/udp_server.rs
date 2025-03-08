@@ -1,11 +1,12 @@
-use crate::command_executor::{CommandExecutor, ExecutionResult};
-use crate::gui::AppEvents;
+use crate::{
+    command_executor::{CommandExecutor, ExecutionResult},
+    gui::AppEvents,
+};
 use log::{error, warn};
-use servicepoint::Command;
-use std::io::ErrorKind;
-use std::net::UdpSocket;
-use std::sync::mpsc::Receiver;
-use std::time::Duration;
+use servicepoint::TypedCommand;
+use std::{
+    io::ErrorKind, net::UdpSocket, sync::mpsc::Receiver, time::Duration,
+};
 use winit::event_loop::EventLoopProxy;
 
 const BUF_SIZE: usize = 8985;
@@ -65,13 +66,13 @@ impl<'t> UdpServer<'t> {
         }
     }
 
-    fn command_from_slice(slice: &[u8]) -> Option<Command> {
+    fn command_from_slice(slice: &[u8]) -> Option<TypedCommand> {
         let packet = servicepoint::Packet::try_from(slice)
             .inspect_err(|_| {
                 warn!("could not load packet with length {}", slice.len())
             })
             .ok()?;
-        Command::try_from(packet)
+        TypedCommand::try_from(packet)
             .inspect_err(move |err| {
                 warn!("could not read command for packet: {:?}", err)
             })

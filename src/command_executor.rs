@@ -1,13 +1,19 @@
-use crate::command_executor::ExecutionResult::{Failure, Shutdown, Success};
-use crate::cp437_font::Cp437Font;
-use crate::font_renderer::FontRenderer8x8;
+use crate::{
+    command_executor::ExecutionResult::{Failure, Shutdown, Success},
+    cp437_font::Cp437Font,
+    font_renderer::FontRenderer8x8,
+};
 use log::{debug, error, info, trace, warn};
 use servicepoint::{
-    BitVec, Bitmap, BrightnessGrid, CharGrid, Command, Cp437Grid, Grid, Offset,
-    Origin, Tiles, PIXEL_COUNT, PIXEL_WIDTH, TILE_SIZE,
+    BinaryOperation, BitVec, BitVecCommand, Bitmap, BitmapCommand,
+    BrightnessCommand, BrightnessGrid, BrightnessGridCommand, CharGrid,
+    CharGridCommand, Cp437Grid, Cp437GridCommand, Grid, Offset, Origin, Tiles,
+    TypedCommand, PIXEL_COUNT, PIXEL_WIDTH, TILE_SIZE,
 };
-use std::ops::{BitAnd, BitOr, BitXor};
-use std::sync::RwLock;
+use std::{
+    ops::{BitAnd, BitOr, BitXor},
+    sync::RwLock,
+};
 
 #[derive(Debug)]
 pub struct CommandExecutor<'t> {
@@ -38,53 +44,62 @@ impl<'t> CommandExecutor<'t> {
         }
     }
 
-    pub(crate) fn execute(&self, command: Command) -> ExecutionResult {
+    pub(crate) fn execute(&self, command: TypedCommand) -> ExecutionResult {
         debug!("received {command:?}");
         match command {
-            Command::Clear => {
+            TypedCommand::Clear(_) => {
                 info!("clearing display");
                 self.display.write().unwrap().fill(false);
                 Success
             }
-            Command::HardReset => {
+            TypedCommand::HardReset(_) => {
                 warn!("display shutting down");
                 Shutdown
             }
-            Command::BitmapLinearWin(Origin { x, y, .. }, pixels, _) => {
-                self.print_pixel_grid(x, y, &pixels)
-            }
-            Command::Cp437Data(origin, grid) => {
+            TypedCommand::Bitmap(BitmapCommand {
+                                     origin: Origin { x, y, .. },
+                                     bitmap,
+                                     ..
+                                 }) => self.print_pixel_grid(x, y, &bitmap),
+            TypedCommand::Cp437Grid(Cp437GridCommand { origin, grid }) => {
                 self.print_cp437_data(origin, &grid)
             }
             #[allow(deprecated)]
-            Command::BitmapLegacy => {
+            TypedCommand::BitmapLegacy(_) => {
                 warn!("ignoring deprecated command {:?}", command);
                 Failure
             }
-            Command::BitmapLinearAnd(offset, vec, _) => {
-                self.execute_bitmap_linear(offset, vec, BitAnd::bitand)
+            TypedCommand::BitVec(command) => {
+                let BitVecCommand {
+                    offset,
+                    bitvec,
+                    operation,
+                    ..
+                } = command;
+                fn overwrite(_: bool, new: bool) -> bool {
+                    new
+                }
+                let operation = match operation {
+                    BinaryOperation::Overwrite => overwrite,
+                    BinaryOperation::And => BitAnd::bitand,
+                    BinaryOperation::Or => BitOr::bitor,
+                    BinaryOperation::Xor => BitXor::bitxor,
+                };
+                self.execute_bitmap_linear(offset, bitvec, operation)
             }
-            Command::BitmapLinearOr(offset, vec, _) => {
-                self.execute_bitmap_linear(offset, vec, BitOr::bitor)
-            }
-            Command::BitmapLinearXor(offset, vec, _) => {
-                self.execute_bitmap_linear(offset, vec, BitXor::bitxor)
-            }
-            Command::BitmapLinear(offset, vec, _) => {
-                self.execute_bitmap_linear(offset, vec, move |_, new| new)
-            }
-            Command::CharBrightness(origin, grid) => {
-                self.execute_char_brightness(origin, grid)
-            }
-            Command::Brightness(brightness) => {
+            TypedCommand::BrightnessGrid(BrightnessGridCommand {
+                                             origin,
+                                             grid,
+                                         }) => self.execute_char_brightness(origin, grid),
+            TypedCommand::Brightness(BrightnessCommand { brightness }) => {
                 self.luma.write().unwrap().fill(brightness);
                 Success
             }
-            Command::FadeOut => {
+            TypedCommand::FadeOut(_) => {
                 error!("command not implemented: {command:?}");
                 Success
             }
-            Command::Utf8Data(origin, grid) => {
+            TypedCommand::CharGrid(CharGridCommand { origin, grid }) => {
                 self.print_utf8_data(origin, &grid)
             }
         }
