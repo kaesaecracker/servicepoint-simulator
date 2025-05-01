@@ -5,7 +5,7 @@ use crate::{
 };
 use log::{debug, error, info, trace, warn};
 use servicepoint::{
-    BinaryOperation, BitVecCommand, Bitmap, BitmapCommand, BrightnessCommand,
+    BinaryOperation, BitVecCommand, Bitmap, BitmapCommand, GlobalBrightnessCommand,
     BrightnessGrid, BrightnessGridCommand, CharGridCommand, ClearCommand,
     CompressionCode, Cp437GridCommand, FadeOutCommand, Grid, HardResetCommand,
     Origin, TypedCommand, PIXEL_COUNT, PIXEL_WIDTH, TILE_SIZE,
@@ -214,7 +214,7 @@ impl CommandExecute for CharGridCommand {
     }
 }
 
-impl CommandExecute for BrightnessCommand {
+impl CommandExecute for GlobalBrightnessCommand {
     fn execute(&self, context: &CommandExecutionContext) -> ExecutionResult {
         context.luma.write().unwrap().fill(self.brightness);
         Success

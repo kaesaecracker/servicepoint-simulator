@@ -39,11 +39,11 @@ fn main() {
         .font
         .map(FontRenderer8x8::from_name)
         .unwrap_or_else(FontRenderer8x8::default);
-    let command_executor = CommandExecutionContext::new(&display, &luma, font_renderer);
+    let context = CommandExecutionContext::new(&display, &luma, font_renderer);
     let mut udp_server = UdpServer::new(
         cli.bind,
         stop_udp_rx,
-        command_executor,
+        context,
         event_loop.create_proxy(),
     );
     let mut gui = Gui::new(&display, &luma, stop_udp_tx, cli.gui);
