@@ -10,7 +10,7 @@ use std::{
 };
 use winit::event_loop::EventLoopProxy;
 
-const BUF_SIZE: usize = 8985;
+const BUF_SIZE: usize = 8985 * 2;
 
 #[derive(Debug)]
 pub struct UdpServer<'t> {
