@@ -1,20 +1,22 @@
-use crate::command_executor::{CommandExecutor, ExecutionResult};
-use crate::gui::AppEvents;
-use log::{error, warn};
-use servicepoint::Command;
-use std::io::ErrorKind;
-use std::net::UdpSocket;
-use std::sync::mpsc::Receiver;
-use std::time::Duration;
+use crate::command_executor::CommandExecute;
+use crate::{
+    command_executor::{CommandExecutionContext, ExecutionResult},
+    gui::AppEvents,
+};
+use log::{debug, error, warn};
+use servicepoint::TypedCommand;
+use std::{
+    io::ErrorKind, net::UdpSocket, sync::mpsc::Receiver, time::Duration,
+};
 use winit::event_loop::EventLoopProxy;
 
-const BUF_SIZE: usize = 8985;
+const BUF_SIZE: usize = 8985 * 2;
 
 #[derive(Debug)]
 pub struct UdpServer<'t> {
     socket: UdpSocket,
     stop_rx: Receiver<()>,
-    command_executor: CommandExecutor<'t>,
+    command_executor: CommandExecutionContext<'t>,
     app_events: EventLoopProxy<AppEvents>,
     buf: [u8; BUF_SIZE],
 }
@@ -23,7 +25,7 @@ impl<'t> UdpServer<'t> {
     pub fn new(
         bind: String,
         stop_rx: Receiver<()>,
-        command_executor: CommandExecutor<'t>,
+        command_executor: CommandExecutionContext<'t>,
         app_events: EventLoopProxy<AppEvents>,
     ) -> Self {
         let socket = UdpSocket::bind(bind).expect("could not bind socket");
@@ -45,7 +47,8 @@ impl<'t> UdpServer<'t> {
             if let Some(cmd) = self.receive_into_buf().and_then(|amount| {
                 Self::command_from_slice(&self.buf[..amount])
             }) {
-                match self.command_executor.execute(cmd) {
+                debug!("received {cmd:?}");
+                match cmd.execute(&self.command_executor) {
                     ExecutionResult::Success => {
                         self.app_events
                             .send_event(AppEvents::UdpPacketHandled)
@@ -65,13 +68,13 @@ impl<'t> UdpServer<'t> {
         }
     }
 
-    fn command_from_slice(slice: &[u8]) -> Option<Command> {
+    fn command_from_slice(slice: &[u8]) -> Option<TypedCommand> {
         let packet = servicepoint::Packet::try_from(slice)
             .inspect_err(|_| {
                 warn!("could not load packet with length {}", slice.len())
             })
             .ok()?;
-        Command::try_from(packet)
+        TypedCommand::try_from(packet)
             .inspect_err(move |err| {
                 warn!("could not read command for packet: {:?}", err)
             })

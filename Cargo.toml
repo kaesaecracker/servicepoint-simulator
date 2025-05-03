@@ -1,6 +1,6 @@
 [package]
 name = "servicepoint-simulator"
-version = "0.2.0"
+version = "0.2.1"
 edition = "2021"
 publish = true
 license = "GPL-3.0-or-later"
@@ -20,7 +20,7 @@ clap = { version = "4.5", features = ["derive"] }
 thiserror = "2.0"
 
 # package parsing
-servicepoint = { version = "0.13.2", features = ["all_compressions"] }
+servicepoint = { features = ["all_compressions"], version = "0.14.0" }
 
 # font rendering
 font-kit = "0.14.2"
@@ -31,3 +31,8 @@ pathfinder_geometry = "0.5.1"
 winit = "0.30"
 # for drawing pixels onto the surface of the window
 softbuffer = "0.4.6"
+
+[profile.release]
+lto = true          # Enable link-time optimization
+codegen-units = 1   # Reduce number of codegen units to increase optimizations
+strip = true        # Strip symbols from binary

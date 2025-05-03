@@ -1,6 +1,12 @@
 # servicepoint-simulator
 
-A simulator for the CCCB airport display.
+[![Releases](https://git.berlin.ccc.de/servicepoint/servicepoint-simulator/badges/release.svg)](https://git.berlin.ccc.de/servicepoint/servicepoint-simulator/releases)
+[![crates.io](https://img.shields.io/crates/v/servicepoint-simulator.svg)](https://crates.io/crates/servicepoint-simulator)
+[![Crates.io Total Downloads](https://img.shields.io/crates/d/servicepoint-simulator)](https://crates.io/crates/servicepoint-simulator)
+[![GPLv3 licensed](https://img.shields.io/crates/l/servicepoint-simulator)](./LICENSE)
+[![CI](https://git.berlin.ccc.de/servicepoint/servicepoint-simulator/badges/workflows/rust.yml/badge.svg)](https://git.berlin.ccc.de/servicepoint/servicepoint-simulator)
+
+A simulator for the CCCB service point display.
 
 ![example render](example_render.png)
 
@@ -16,6 +22,10 @@ Use cases:
 
 Uses the [servicepoint](https://github.com/cccb/servicepoint) library for reading the packets.
 The screenshot above shows the output of two example projects running in parallel (game_of_life and random_brightness).
+
+This repository moved
+to [git.berlin.ccc.de/servicepoint/servicepoint-simulator](https://git.berlin.ccc.de/servicepoint/servicepoint-simulator/).
+The [GitHub repository](https://github.com/kaesaecracker/servicepoint-simulator) will remain as a mirror.
 
 ## Running
 
@@ -44,7 +54,8 @@ Options:
 
 See [env_logger](https://docs.rs/env_logger/latest/env_logger/) to configure logging.
 
-Because this program renders to an RGB pixel buffer, you can enjoy the following additional features not available on the real display:
+Because this program renders to an RGB pixel buffer, you can enjoy the following additional features not available on
+the real display:
 
 - enable or disable the empty space between tile rows (`./servicepoint-simulator --spacers` to enable)
 - render pixels in red, green, blue or a combination of the three (`./servicepoint-simulator -rgb` for white pixels)
@@ -64,6 +75,7 @@ All creatures welcome.
 
 ## Legal stuff
 
-The included font is https://int10h.org/oldschool-pc-fonts/fontlist/font?ibm_bios (included in the download from https://int10h.org/oldschool-pc-fonts/download/). The font is CC BY-SA 4.0.
+The included font is https://int10h.org/oldschool-pc-fonts/fontlist/font?ibm_bios (included in the download
+from https://int10h.org/oldschool-pc-fonts/download/). The font is CC BY-SA 4.0.
 
 For everything else see the LICENSE file.

@@ -1,7 +1,6 @@
-use std::{sync::mpsc::Sender, sync::RwLock};
-
 use log::{info, warn};
 use servicepoint::*;
+use std::{sync::mpsc::Sender, sync::RwLock};
 use winit::{
     application::ApplicationHandler, dpi::LogicalSize, event::WindowEvent,
     event_loop::ActiveEventLoop, keyboard::KeyCode::KeyC, window::WindowId,

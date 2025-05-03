@@ -2,7 +2,7 @@
 
 use crate::font_renderer::FontRenderer8x8;
 use crate::udp_server::UdpServer;
-use crate::{command_executor::CommandExecutor, gui::Gui};
+use crate::{command_executor::CommandExecutionContext, gui::Gui};
 use clap::Parser;
 use cli::Cli;
 use log::{info, LevelFilter};
@@ -32,18 +32,18 @@ fn main() {
         .expect("could not create event loop");
     event_loop.set_control_flow(ControlFlow::Wait);
 
-    let display = RwLock::new(Bitmap::new(PIXEL_WIDTH, PIXEL_HEIGHT));
+    let display = RwLock::new(Bitmap::max_sized());
     let luma = RwLock::new(BrightnessGrid::new(TILE_WIDTH, TILE_HEIGHT));
     let (stop_udp_tx, stop_udp_rx) = mpsc::channel();
     let font_renderer = cli
         .font
         .map(FontRenderer8x8::from_name)
         .unwrap_or_else(FontRenderer8x8::default);
-    let command_executor = CommandExecutor::new(&display, &luma, font_renderer);
+    let context = CommandExecutionContext::new(&display, &luma, font_renderer);
     let mut udp_server = UdpServer::new(
         cli.bind,
         stop_udp_rx,
-        command_executor,
+        context,
         event_loop.create_proxy(),
     );
     let mut gui = Gui::new(&display, &luma, stop_udp_tx, cli.gui);
