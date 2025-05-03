@@ -1,6 +1,12 @@
 # servicepoint-simulator
 
-A simulator for the CCCB airport display.
+[![Releases](https://git.berlin.ccc.de/servicepoint/servicepoint-simulator/badges/release.svg)](https://git.berlin.ccc.de/servicepoint/servicepoint-simulator/releases)
+[![crates.io](https://img.shields.io/crates/v/servicepoint-simulator.svg)](https://crates.io/crates/servicepoint-simulator)
+[![Crates.io Total Downloads](https://img.shields.io/crates/d/servicepoint-simulator)](https://crates.io/crates/servicepoint-simulator)
+[![GPLv3 licensed](https://img.shields.io/crates/l/servicepoint-simulator)](./LICENSE)
+[![CI](https://git.berlin.ccc.de/servicepoint/servicepoint-simulator/badges/workflows/rust.yml/badge.svg)](https://git.berlin.ccc.de/servicepoint/servicepoint-simulator)
+
+A simulator for the CCCB service point display.
 
 ![example render](example_render.png)
 
