@@ -1,6 +1,6 @@
 [package]
 name = "servicepoint-simulator"
-version = "0.2.1"
+version = "0.2.2"
 edition = "2021"
 publish = true
 license = "GPL-3.0-or-later"
@@ -20,7 +20,7 @@ clap = { version = "4.5", features = ["derive"] }
 thiserror = "2.0"
 
 # package parsing
-servicepoint = { features = ["all_compressions"], version = "0.14.0" }
+servicepoint = { features = ["all_compressions"], version = "0.15.1" }
 
 # font rendering
 font-kit = "0.14.2"
