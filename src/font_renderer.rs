@@ -102,8 +102,8 @@ impl FontRenderer8x8 {
         for y in 0..TILE_SIZE {
             for x in 0..TILE_SIZE {
                 let canvas_val = canvas.pixels[x + y * TILE_SIZE] != 0;
-                let bitmap_x = (offset.x + x) as isize;
-                let bitmap_y = (offset.y + y) as isize;
+                let bitmap_x = offset.x + x;
+                let bitmap_y = offset.y + y;
                 if !bitmap.set_optional(bitmap_x, bitmap_y, canvas_val) {
                     return Err(OutOfBounds(x, y));
                 }

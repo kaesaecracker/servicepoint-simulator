@@ -7,7 +7,7 @@ license = "GPL-3.0-or-later"
 keywords = ["cccb", "cccb-servicepoint", "cli"]
 description = "A simulator for the Service Point display."
 homepage = "https://git.berlin.ccc.de/servicepoint/servicepoint-simulator"
-repository = "https://git.berlin.ccc.de/servicepoint/servicepoint-simulator"
+repository = "https://git.berlin.ccc.de/servicepoint/servicepoint-simulator.git"
 readme = "README.md"
 rust-version = "1.80.0"
 resolver = "2"
@@ -20,7 +20,7 @@ clap = { version = "4.5", features = ["derive"] }
 thiserror = "2.0"
 
 # package parsing
-servicepoint = { features = ["all_compressions"], version = "0.15.1" }
+servicepoint = { features = ["all_compressions"], version = "0.15.2" }
 
 # font rendering
 font-kit = "0.14.2"
