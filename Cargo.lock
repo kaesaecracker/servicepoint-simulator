@@ -1521,9 +1521,9 @@ dependencies = [
 
 [[package]]
 name = "servicepoint"
-version = "0.15.1"
+version = "0.15.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2800caad491cb44f67e5dd5b8c61ece368eecfe588155d03c7d9864acbad6919"
+checksum = "7d1e88713031e003dc3ee708dbb282e36714eee466a12d311d0e2e24c61c7118"
 dependencies = [
  "bitvec",
  "bzip2",
@@ -1538,7 +1538,7 @@ dependencies = [
 
 [[package]]
 name = "servicepoint-simulator"
-version = "0.2.2"
+version = "0.2.3"
 dependencies = [
  "clap",
  "env_logger",
