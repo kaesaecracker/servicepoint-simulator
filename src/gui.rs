@@ -24,6 +24,7 @@ const PIXEL_HEIGHT_WITH_SPACERS: usize =
     PIXEL_HEIGHT + NUM_SPACERS * SPACER_HEIGHT;
 
 const OFF_COLOR: u32 = u32::from_ne_bytes([0u8, 0, 0, 0]);
+const SPACER_COLOR: u32 = u32::from_ne_bytes([100u8, 100, 100, 0]);
 
 #[derive(Debug)]
 pub enum AppEvents {
@@ -61,7 +62,7 @@ impl<'t> Gui<'t> {
             if self.options.spacers && tile_y != 0 {
                 // cannot just frame.skip(PIXEL_WIDTH as usize * SPACER_HEIGHT as usize) because of typing
                 for _ in 0..PIXEL_WIDTH * SPACER_HEIGHT {
-                    frame.next().unwrap();
+                    *frame.next().unwrap() = SPACER_COLOR;
                 }
             }
 

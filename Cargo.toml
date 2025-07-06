@@ -19,9 +19,6 @@ env_logger = "0.11"
 clap = { version = "4.5", features = ["derive"] }
 thiserror = "2.0"
 
-# package parsing
-servicepoint = { features = ["all_compressions"], version = "0.15.2" }
-
 # font rendering
 font-kit = "0.14.2"
 # I should not need this as a direct dependency, but then I cannot spell the types needed to use font-kit...
@@ -31,6 +28,11 @@ pathfinder_geometry = "0.5.1"
 winit = "0.30"
 # for drawing pixels onto the surface of the window
 softbuffer = "0.4.6"
+
+[dependencies.servicepoint]
+version = "0.16.0"
+features = ["all_compressions"]
+path = "../servicepoint-uniffi3"
 
 [profile.release]
 lto = true          # Enable link-time optimization

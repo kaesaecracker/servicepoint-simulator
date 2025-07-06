@@ -5,10 +5,11 @@ use crate::{
 };
 use log::{debug, error, info, trace, warn};
 use servicepoint::{
-    BinaryOperation, BitVecCommand, Bitmap, BitmapCommand, GlobalBrightnessCommand,
-    BrightnessGrid, BrightnessGridCommand, CharGridCommand, ClearCommand,
-    CompressionCode, Cp437GridCommand, FadeOutCommand, Grid, HardResetCommand,
-    Origin, TypedCommand, PIXEL_COUNT, PIXEL_WIDTH, TILE_SIZE,
+    BinaryOperation, BitVecCommand, Bitmap, BitmapCommand, BrightnessGrid,
+    BrightnessGridCommand, CharGridCommand, ClearCommand, CompressionCode,
+    Cp437GridCommand, FadeOutCommand, GlobalBrightnessCommand,
+    HardResetCommand, Origin, TypedCommand, PIXEL_COUNT, PIXEL_WIDTH,
+    TILE_SIZE,
 };
 use std::{
     ops::{BitAnd, BitOr, BitXor},
@@ -46,11 +47,11 @@ impl CommandExecute for BitmapCommand {
     fn execute(&self, context: &CommandExecutionContext) -> ExecutionResult {
         let Self {
             origin:
-            Origin {
-                x: offset_x,
-                y: offset_y,
-                ..
-            },
+                Origin {
+                    x: offset_x,
+                    y: offset_y,
+                    ..
+                },
             bitmap: pixels,
             ..
         } = self;
@@ -143,7 +144,7 @@ impl CommandExecute for Cp437GridCommand {
                     bitmap: context.cp437_font[char_code].clone(),
                     compression: CompressionCode::default(),
                 }
-                    .execute(context);
+                .execute(context);
                 match execute_result {
                     Success => {}
                     Failure => {
@@ -199,8 +200,14 @@ impl CommandExecute for CharGridCommand {
 
                 if let Err(e) = context.font_renderer.render(
                     char,
-                    &mut display,
-                    Origin::new(tile_x * TILE_SIZE, tile_y * TILE_SIZE),
+                    &mut display
+                        .window_mut(
+                            tile_x * TILE_SIZE,
+                            tile_y * TILE_SIZE,
+                            TILE_SIZE,
+                            TILE_SIZE,
+                        )
+                        .unwrap(),
                 ) {
                     error!(
                         "stopping drawing text because char draw failed: {e}"
