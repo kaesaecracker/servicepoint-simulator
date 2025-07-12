@@ -32,7 +32,6 @@ softbuffer = "0.4.6"
 [dependencies.servicepoint]
 version = "0.16.0"
 features = ["all_compressions"]
-path = "../servicepoint-uniffi3"
 
 [profile.release]
 lto = true          # Enable link-time optimization

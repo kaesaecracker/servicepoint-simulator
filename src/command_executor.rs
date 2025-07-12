@@ -7,7 +7,7 @@ use log::{debug, error, info, trace, warn};
 use servicepoint::{
     BinaryOperation, BitVecCommand, Bitmap, BitmapCommand, BrightnessGrid,
     BrightnessGridCommand, CharGridCommand, ClearCommand, CompressionCode,
-    Cp437GridCommand, FadeOutCommand, GlobalBrightnessCommand,
+    Cp437GridCommand, FadeOutCommand, GlobalBrightnessCommand, Grid, GridMut,
     HardResetCommand, Origin, TypedCommand, PIXEL_COUNT, PIXEL_WIDTH,
     TILE_SIZE,
 };
@@ -195,17 +195,15 @@ impl CommandExecute for CharGridCommand {
                 let char = grid.get(char_x, char_y);
                 trace!("drawing {char}");
 
-                let tile_x = char_x + x;
-                let tile_y = char_y + y;
+                let pixel_x = (char_x + x) * TILE_SIZE;
+                let pixel_y = (char_y + y) * TILE_SIZE;
 
                 if let Err(e) = context.font_renderer.render(
                     char,
                     &mut display
                         .window_mut(
-                            tile_x * TILE_SIZE,
-                            tile_y * TILE_SIZE,
-                            TILE_SIZE,
-                            TILE_SIZE,
+                            pixel_x..pixel_x + TILE_SIZE,
+                            pixel_y..pixel_y + TILE_SIZE,
                         )
                         .unwrap(),
                 ) {

@@ -761,17 +761,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "inherent"
-version = "1.0.12"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6c38228f24186d9cc68c729accb4d413be9eaed6ad07ff79e0270d9e56f3de13"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn",
-]
-
-[[package]]
 name = "is_terminal_polyfill"
 version = "1.70.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1522,11 +1511,12 @@ dependencies = [
 [[package]]
 name = "servicepoint"
 version = "0.16.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9b04582e916474f1bc1605cad3773262c425d9062b487e49a0df59662f2cca8d"
 dependencies = [
  "bitvec",
  "bzip2",
  "flate2",
- "inherent",
  "log",
  "once_cell",
  "rust-lzma",
