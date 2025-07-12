@@ -12,8 +12,11 @@ use pathfinder_geometry::{
     transform2d::Transform2F,
     vector::{vec2f, vec2i},
 };
-use servicepoint::{Bitmap, Grid, Origin, Pixels, TILE_SIZE};
-use std::sync::{Mutex, MutexGuard};
+use servicepoint::{Bitmap, GridMut, WindowMut, TILE_SIZE};
+use std::{
+    collections::HashMap,
+    sync::{Mutex, MutexGuard},
+};
 
 #[derive(Debug)]
 struct SendFont(Font);
@@ -32,6 +35,7 @@ pub struct FontRenderer8x8 {
     font: SendFont,
     canvas: Mutex<Canvas>,
     fallback_char: Option<u32>,
+    cache: Mutex<HashMap<char, Bitmap>>,
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -56,6 +60,7 @@ impl FontRenderer8x8 {
             font: SendFont(font),
             fallback_char,
             canvas: Mutex::new(canvas),
+            cache: Mutex::new(HashMap::new()),
         }
     }
 
@@ -74,9 +79,13 @@ impl FontRenderer8x8 {
     pub fn render(
         &self,
         char: char,
-        bitmap: &mut Bitmap,
-        offset: Origin<Pixels>,
+        target: &mut WindowMut<bool, Bitmap>,
     ) -> Result<(), RenderError> {
+        let cache = &mut *self.cache.lock().unwrap();
+        if let Some(drawn_char) = cache.get(&char) {
+            target.deref_assign(drawn_char);
+        }
+
         let glyph_id = self.get_glyph(char)?;
 
         let mut canvas = self.canvas.lock().unwrap();
@@ -91,20 +100,21 @@ impl FontRenderer8x8 {
             RasterizationOptions::Bilevel,
         )?;
 
-        Self::copy_to_bitmap(canvas, bitmap, offset)
+        let mut bitmap = Bitmap::new(TILE_SIZE, TILE_SIZE).unwrap();
+        Self::copy_to_bitmap(canvas, &mut bitmap)?;
+        target.deref_assign(&bitmap);
+        cache.insert(char, bitmap);
+        Ok(())
     }
 
     fn copy_to_bitmap(
         canvas: MutexGuard<Canvas>,
         bitmap: &mut Bitmap,
-        offset: Origin<Pixels>,
     ) -> Result<(), RenderError> {
         for y in 0..TILE_SIZE {
             for x in 0..TILE_SIZE {
                 let canvas_val = canvas.pixels[x + y * TILE_SIZE] != 0;
-                let bitmap_x = offset.x + x;
-                let bitmap_y = offset.y + y;
-                if !bitmap.set_optional(bitmap_x, bitmap_y, canvas_val) {
+                if !bitmap.set_optional(x, y, canvas_val) {
                     return Err(OutOfBounds(x, y));
                 }
             }

@@ -42,14 +42,24 @@ Make sure to run a release build, because a debug build _way_ slower.
 Usage: servicepoint-simulator [OPTIONS]
 
 Options:
-      --bind <BIND>  address and port to bind to [default: 0.0.0.0:2342]
-  -f, --font <FONT>  The name of the font family to use. This defaults to the system monospace font.
-  -s, --spacers      add spacers between tile rows to simulate gaps in real display
-  -r, --red          Use the red color channel
-  -g, --green        Use the green color channel
-  -b, --blue         Use the blue color channel
-  -v, --verbose      Set default log level lower. You can also change this via the RUST_LOG environment variable.
-  -h, --help         Print help
+      --bind <BIND>
+          address and port to bind to [default: 0.0.0.0:2342]
+  -f, --font <FONT>
+          The name of the font family to use. This defaults to the system monospace font.
+  -s, --spacers
+          add spacers between tile rows to simulate gaps in real display
+  -r, --red
+          Use the red color channel
+  -g, --green
+          Use the green color channel
+  -b, --blue
+          Use the blue color channel
+  -v, --verbose
+          Set default log level lower. You can also change this via the RUST_LOG environment variable.
+      --experimental-null-char-handling
+          When receiving a null byte as a char in the CharGridCommand, do not overwrite any pixels instead of clearing all pixels.
+  -h, --help
+          Print help
 ```
 
 See [env_logger](https://docs.rs/env_logger/latest/env_logger/) to configure logging.

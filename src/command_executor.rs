@@ -5,10 +5,11 @@ use crate::{
 };
 use log::{debug, error, info, trace, warn};
 use servicepoint::{
-    BinaryOperation, BitVecCommand, Bitmap, BitmapCommand, GlobalBrightnessCommand,
-    BrightnessGrid, BrightnessGridCommand, CharGridCommand, ClearCommand,
-    CompressionCode, Cp437GridCommand, FadeOutCommand, Grid, HardResetCommand,
-    Origin, TypedCommand, PIXEL_COUNT, PIXEL_WIDTH, TILE_SIZE,
+    BinaryOperation, BitVecCommand, Bitmap, BitmapCommand, BrightnessGrid,
+    BrightnessGridCommand, CharGridCommand, ClearCommand, CompressionCode,
+    Cp437GridCommand, FadeOutCommand, GlobalBrightnessCommand, Grid, GridMut,
+    HardResetCommand, Origin, TypedCommand, PIXEL_COUNT, PIXEL_WIDTH,
+    TILE_SIZE,
 };
 use std::{
     ops::{BitAnd, BitOr, BitXor},
@@ -21,6 +22,7 @@ pub struct CommandExecutionContext<'t> {
     luma: &'t RwLock<BrightnessGrid>,
     cp437_font: Cp437Font,
     font_renderer: FontRenderer8x8,
+    experimental_null_char_handling: bool,
 }
 
 #[must_use]
@@ -46,11 +48,11 @@ impl CommandExecute for BitmapCommand {
     fn execute(&self, context: &CommandExecutionContext) -> ExecutionResult {
         let Self {
             origin:
-            Origin {
-                x: offset_x,
-                y: offset_y,
-                ..
-            },
+                Origin {
+                    x: offset_x,
+                    y: offset_y,
+                    ..
+                },
             bitmap: pixels,
             ..
         } = self;
@@ -143,7 +145,7 @@ impl CommandExecute for Cp437GridCommand {
                     bitmap: context.cp437_font[char_code].clone(),
                     compression: CompressionCode::default(),
                 }
-                    .execute(context);
+                .execute(context);
                 match execute_result {
                     Success => {}
                     Failure => {
@@ -192,16 +194,30 @@ impl CommandExecute for CharGridCommand {
         for char_y in 0usize..grid.height() {
             for char_x in 0usize..grid.width() {
                 let char = grid.get(char_x, char_y);
+                let mut bitmap_window = {
+                    let pixel_x = (char_x + x) * TILE_SIZE;
+                    let pixel_y = (char_y + y) * TILE_SIZE;
+                    display
+                        .window_mut(
+                            pixel_x..pixel_x + TILE_SIZE,
+                            pixel_y..pixel_y + TILE_SIZE,
+                        )
+                        .unwrap()
+                };
+
+                if char == '\0' {
+                    if context.experimental_null_char_handling {
+                        trace!("skipping {char:?}");
+                    } else {
+                        bitmap_window.fill(false);
+                    }
+                    continue;
+                }
+
                 trace!("drawing {char}");
-
-                let tile_x = char_x + x;
-                let tile_y = char_y + y;
-
-                if let Err(e) = context.font_renderer.render(
-                    char,
-                    &mut display,
-                    Origin::new(tile_x * TILE_SIZE, tile_y * TILE_SIZE),
-                ) {
+                if let Err(e) =
+                    context.font_renderer.render(char, &mut bitmap_window)
+                {
                     error!(
                         "stopping drawing text because char draw failed: {e}"
                     );
@@ -251,12 +267,14 @@ impl<'t> CommandExecutionContext<'t> {
         display: &'t RwLock<Bitmap>,
         luma: &'t RwLock<BrightnessGrid>,
         font_renderer: FontRenderer8x8,
+        experimental_null_char_handling: bool,
     ) -> Self {
         CommandExecutionContext {
             display,
             luma,
             font_renderer,
             cp437_font: Cp437Font::default(),
+            experimental_null_char_handling,
         }
     }
 }

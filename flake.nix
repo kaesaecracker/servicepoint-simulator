@@ -75,6 +75,7 @@
             NIX_LD_LIBRARY_PATH = LD_LIBRARY_PATH;
             NIX_LD = pkgs.stdenv.cc.bintools.dynamicLinker;
             RUST_SRC_PATH = "${pkgs.rust.packages.stable.rustPlatform.rustLibSrc}";
+            RUST_BACKTRACE = "1";
           };
         }
       );
