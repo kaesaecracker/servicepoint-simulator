@@ -22,6 +22,11 @@ pub struct Cli {
         help = "Set default log level lower. You can also change this via the RUST_LOG environment variable."
     )]
     pub verbose: bool,
+    #[arg(
+        long,
+        help = "When receiving a null byte as a char in the CharGridCommand, do not overwrite any pixels instead of clearing all pixels."
+    )]
+    pub experimental_null_char_handling: bool,
 }
 
 #[derive(Parser, Debug)]
