@@ -11,7 +11,7 @@
   };
 
   outputs =
-    inputs@{
+    {
       self,
       nixpkgs,
       naersk,
@@ -47,6 +47,14 @@
         }
       );
 
+      nixosModules.default = {
+        nixpkgs.overlays = [ self.overlays.servicepoint-packages ];
+      };
+
+      overlays.default = final: prev: {
+        servicepoint-simulator = self.legacyPackages."${prev.system}".servicepoint-simulator;
+      };
+
       legacyPackages = packages;
 
       devShells = forAllSystems (
@@ -80,6 +88,6 @@
         }
       );
 
-      formatter = forAllSystems ({ pkgs, ... }: pkgs.nixfmt-rfc-style);
+      formatter = forAllSystems ({ pkgs, ... }: pkgs.nixfmt-tree);
     };
 }
