@@ -48,7 +48,7 @@
       );
 
       nixosModules.default = {
-        nixpkgs.overlays = [ self.overlays.servicepoint-packages ];
+        nixpkgs.overlays = [ self.overlays.default ];
       };
 
       overlays.default = final: prev: {
