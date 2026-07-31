@@ -3,19 +3,14 @@
 
   inputs = {
     nixpkgs.url = "github:nixos/nixpkgs/nixos-26.05";
-    nix-filter.url = "github:numtide/nix-filter";
-    naersk = {
-      url = "github:nix-community/naersk";
-      inputs.nixpkgs.follows = "nixpkgs";
-    };
+    crane.url = "github:ipetkov/crane";
   };
 
   outputs =
     {
       self,
       nixpkgs,
-      naersk,
-      nix-filter,
+      crane,
     }:
     let
       lib = nixpkgs.lib;
@@ -40,8 +35,8 @@
         { pkgs, ... }:
         rec {
           servicepoint-simulator = import ./servicepoint-simulator.nix {
-            inherit nix-filter pkgs;
-            naersk' = pkgs.callPackage naersk { };
+            inherit pkgs;
+            craneLib = crane.mkLib pkgs;
           };
           default = servicepoint-simulator;
         }
