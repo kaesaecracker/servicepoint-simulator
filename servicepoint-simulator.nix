@@ -51,11 +51,11 @@ naersk'.buildPackage rec {
         wayland
 
         # WINIT_UNIX_BACKEND=x11
-        xorg.libXcursor
-        xorg.libXrandr
-        xorg.libXi
-        xorg.libX11
-        xorg.libX11.dev
+        libxcursor
+        libxrandr
+        libxi
+        libx11
+        libx11.dev
       ]
     )
     ++ lib.optionals pkgs.stdenv.isDarwin (
