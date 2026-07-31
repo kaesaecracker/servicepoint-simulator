@@ -37,7 +37,7 @@ impl GuiWindow {
         }
     }
 
-    pub fn get_buffer(&mut self) -> Buffer<Rc<Window>, Rc<Window>> {
+    pub fn get_buffer(&mut self) -> Buffer<'_, Rc<Window>, Rc<Window>> {
         self.surface.buffer_mut().unwrap()
     }
     pub(crate) fn request_redraw(&self) {
