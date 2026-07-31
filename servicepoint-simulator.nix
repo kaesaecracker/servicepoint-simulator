@@ -47,14 +47,6 @@ let
           libx11
           libx11.dev
         ]
-      )
-      ++ lib.optionals pkgs.stdenv.isDarwin (
-        with pkgs.darwin.apple_sdk.frameworks;
-        [
-          Carbon
-          QuartzCore
-          AppKit
-        ]
       );
   };
 in
