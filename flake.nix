@@ -2,7 +2,7 @@
   description = "Flake for servicepoint-simulator";
 
   inputs = {
-    nixpkgs.url = "github:nixos/nixpkgs/nixos-25.05";
+    nixpkgs.url = "github:nixos/nixpkgs/nixos-26.05";
     nix-filter.url = "github:numtide/nix-filter";
     naersk = {
       url = "github:nix-community/naersk";
