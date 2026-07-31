@@ -47,7 +47,8 @@
       };
 
       overlays.default = final: prev: {
-        servicepoint-simulator = self.legacyPackages."${prev.system}".servicepoint-simulator;
+        servicepoint-simulator =
+          self.legacyPackages."${prev.stdenv.hostPlatform.system}".servicepoint-simulator;
       };
 
       legacyPackages = packages;
